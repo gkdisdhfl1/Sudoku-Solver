@@ -45,6 +45,32 @@ void SudokuBackend::clear()
     emit boardChanged();
 }
 
+bool SudokuBackend::isValidBoard()
+{
+    // 모든 채워진 칸에 대해 규칙 위반 여부 검사
+    for(int r = 0; r < 9; ++r) {
+        for(int c = 0; c < 9; ++c) {
+            int num = m_board[r][c];
+            if(num != 0) {
+                // 현재 위치(r,c)의 값을 잠시 0으로 비움 (자기 자신과 충돌 방지)
+                m_board[r][c] = 0;
+
+                // 해당 숫자가 유효한지 검사
+                if(!isValid(m_board, r, c, num)) {
+                    // 유효하지 않으면 false 리턴
+                    m_board[r][c] = num;
+                    return false;
+                }
+
+                // 원상복구
+                m_board[r][c] = num;
+            }
+        }
+    }
+    return true;
+}
+
+// --- algorithm ---
 bool SudokuBackend::solveBacktracking()
 {
     QVector<QVector<int>> tempBoard = m_board;
@@ -56,6 +82,8 @@ bool SudokuBackend::solveBacktracking()
     return false;
 }
 
+
+//  --- private ---
 bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, int num)
 {
     // 같은 행/열 체크

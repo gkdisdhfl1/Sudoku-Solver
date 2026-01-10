@@ -87,6 +87,14 @@ Window {
                 text: "Solve"
                 highlighted: true
                 onClicked: {
+                    // 1. 유효성 검사
+                    if(!backend.isValidBoard()) {
+                        console.log("Invalid board configuration!");
+                        // todo: 나중에 팝업 등으로 사용자에게 알림
+                        return;
+                    }
+
+                    // 2. 풀이 시도
                     if(!backend.solveBacktracking()) {
                         console.log("Solution not found");
                     }

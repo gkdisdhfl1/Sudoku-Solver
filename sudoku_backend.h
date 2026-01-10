@@ -18,6 +18,7 @@ public:
     Q_INVOKABLE void setCell(int index, int value);
     // Q_INVOKABLE int getCell(int index) const;
     Q_INVOKABLE void clear();
+    Q_INVOKABLE bool isValidBoard();
 
     // Algorithm
     Q_INVOKABLE bool solveBacktracking();
