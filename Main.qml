@@ -46,10 +46,13 @@ Window {
                     // 3x3 구역 구분을 위한 배경색 교차 (체커보드 스타일)
                     readonly property bool isDarkBlock: (blockRow + blockCol) % 2 !== 0
 
+                    // 백엔드의 errorCells 리스트에 현재 인덱스가 포함되어 있는지  확인
+                    readonly property bool isError: backend.errorCells.includes(index);
+
                     implicitWidth: 45
                     implicitHeight: 45
 
-                    color: isDarkBlock ? "#ecf0f1" : "#ffffff"
+                    color: isError ? "#ffcccc" : (isDarkBlock ? "#ecf0f1" : "#ffffff")
                     border.color: "#bdc3c7"
                     border.width: 1
 
@@ -61,6 +64,7 @@ Window {
                         verticalAlignment: Text.AlignVCenter
                         background: null
                         selectByMouse: true
+                        color: isError ? "red" : "black" // 에러 시 글자색 빨강
 
                         // 1~9 정수만 입력 가능
                         validator: IntValidator { bottom: 1; top: 9 }

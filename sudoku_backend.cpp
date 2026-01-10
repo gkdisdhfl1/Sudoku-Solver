@@ -23,6 +23,11 @@ QList<int> SudokuBackend::board() const
     return flatList;
 }
 
+QList<int> SudokuBackend::errorCells() const
+{
+    return m_errorCells;
+}
+
 void SudokuBackend::setCell(int index, int value)
 {
     if(index < 0 || index >= 81) return;
@@ -34,6 +39,9 @@ void SudokuBackend::setCell(int index, int value)
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
         emit boardChanged();
+
+        // 값이 바뀔 때마다 에러 상태 갱신
+        checkErrors();
     }
 }
 
@@ -43,6 +51,9 @@ void SudokuBackend::clear()
         m_board[i].fill(0);
     }
     emit boardChanged();
+
+    // 클리어 시 에러 초기화
+    checkErrors();
 }
 
 bool SudokuBackend::isValidBoard()
@@ -68,6 +79,28 @@ bool SudokuBackend::isValidBoard()
         }
     }
     return true;
+}
+
+void SudokuBackend::checkErrors()
+{
+    QList<int> newErrors;
+    for(int r = 0; r < 9; ++r) {
+        for(int c = 0; c < 9; ++c) {
+            int num = m_board[r][c];
+            if(num != 0) {
+                m_board[r][c] = 0;
+                if(!isValid(m_board, r, c, num)) {
+                    newErrors.append(r * 9 + c);
+                }
+                m_board[r][c] = num; // 복구
+            }
+        }
+    }
+
+    if(m_errorCells != newErrors) {
+        m_errorCells = newErrors;
+        emit errorCellsChanged();
+    }
 }
 
 // --- algorithm ---
