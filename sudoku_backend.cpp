@@ -63,18 +63,11 @@ bool SudokuBackend::isValidBoard()
         for(int c = 0; c < 9; ++c) {
             int num = m_board[r][c];
             if(num != 0) {
-                // 현재 위치(r,c)의 값을 잠시 0으로 비움 (자기 자신과 충돌 방지)
-                m_board[r][c] = 0;
-
                 // 해당 숫자가 유효한지 검사
-                if(!isValid(m_board, r, c, num)) {
+                if(!isValid(m_board, r, c, num, true)) {
                     // 유효하지 않으면 false 리턴
-                    m_board[r][c] = num;
                     return false;
                 }
-
-                // 원상복구
-                m_board[r][c] = num;
             }
         }
     }
@@ -88,11 +81,9 @@ void SudokuBackend::checkErrors()
         for(int c = 0; c < 9; ++c) {
             int num = m_board[r][c];
             if(num != 0) {
-                m_board[r][c] = 0;
-                if(!isValid(m_board, r, c, num)) {
+                if(!isValid(m_board, r, c, num, true)) {
                     newErrors.append(r * 9 + c);
                 }
-                m_board[r][c] = num; // 복구
             }
         }
     }
@@ -117,12 +108,18 @@ bool SudokuBackend::solveBacktracking()
 
 
 //  --- private ---
-bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, int num)
+bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf)
 {
     // 같은 행/열 체크
     for(int i{0}; i < 9; ++i) {
-        if(board[r][i] == num) return false;
-        if(board[i][c] == num) return false;
+        // 행 검사: (r, i) 위치 확인
+        if(board[r][i] == num) {
+            if(!ignoreSelf || i != c) return false; // 내 위치가 아니거나, ignoreSelf가 false일 때만 충돌
+        }
+        // 열 검사: (i, c) 위치 확인
+        if(board[i][c] == num) {
+            if(!ignoreSelf || i != r) return false;
+        }
     }
 
     // 3x3 박스 체크
@@ -130,8 +127,11 @@ bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, in
     int startCol = c - c % 3;
     for(int i{0}; i < 3; ++i) {
         for(int j{0}; j < 3; ++j) {
-            if(board[startRow + i][startCol + j] == num)
-                return false;
+            int checkRow = startRow + i;
+            int checkCol = startCol + j;
+            if(board[checkRow][checkCol] == num)  {
+                if(!ignoreSelf || (checkRow != r || checkCol != c)) return false;
+            }
         }
     }
     return true;

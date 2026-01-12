@@ -34,7 +34,7 @@ private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
     QList<int> m_errorCells;
 
-    bool isValid(const QVector<QVector<int>> &board, int r, int c, int num);
+    bool isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf = false);
     bool solveBacktrackingHelper(QVector<QVector<int>> &board);
 };
 
