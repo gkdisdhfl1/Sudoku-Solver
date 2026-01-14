@@ -56,7 +56,7 @@ void SudokuBackend::clear()
     checkErrors();
 }
 
-bool SudokuBackend::isValidBoard()
+bool SudokuBackend::isValidBoard() const
 {
     // 모든 채워진 칸에 대해 규칙 위반 여부 검사
     for(int r = 0; r < 9; ++r) {
@@ -74,26 +74,6 @@ bool SudokuBackend::isValidBoard()
     return true;
 }
 
-void SudokuBackend::checkErrors()
-{
-    QList<int> newErrors;
-    for(int r = 0; r < 9; ++r) {
-        for(int c = 0; c < 9; ++c) {
-            int num = m_board[r][c];
-            if(num != 0) {
-                if(!isValid(m_board, r, c, num, true)) {
-                    newErrors.append(r * 9 + c);
-                }
-            }
-        }
-    }
-
-    if(m_errorCells != newErrors) {
-        m_errorCells = newErrors;
-        emit errorCellsChanged();
-    }
-}
-
 // --- algorithm ---
 bool SudokuBackend::solveBacktracking()
 {
@@ -108,7 +88,7 @@ bool SudokuBackend::solveBacktracking()
 
 
 //  --- private ---
-bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf)
+bool SudokuBackend::isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf) const
 {
     // 같은 행/열 체크
     for(int i{0}; i < 9; ++i) {
@@ -155,4 +135,24 @@ bool SudokuBackend::solveBacktrackingHelper(QVector<QVector<int>> &board)
         }
     }
     return true;
+}
+
+void SudokuBackend::checkErrors()
+{
+    QList<int> newErrors;
+    for(int r = 0; r < 9; ++r) {
+        for(int c = 0; c < 9; ++c) {
+            int num = m_board[r][c];
+            if(num != 0) {
+                if(!isValid(m_board, r, c, num, true)) {
+                    newErrors.append(r * 9 + c);
+                }
+            }
+        }
+    }
+
+    if(m_errorCells != newErrors) {
+        m_errorCells = newErrors;
+        emit errorCellsChanged();
+    }
 }

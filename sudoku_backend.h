@@ -20,8 +20,7 @@ public:
     Q_INVOKABLE void setCell(int index, int value);
     // Q_INVOKABLE int getCell(int index) const;
     Q_INVOKABLE void clear();
-    Q_INVOKABLE bool isValidBoard();
-    Q_INVOKABLE void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
+    Q_INVOKABLE bool isValidBoard() const;
 
     // Algorithm
     Q_INVOKABLE bool solveBacktracking();
@@ -34,8 +33,9 @@ private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
     QList<int> m_errorCells;
 
-    bool isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf = false);
+    bool isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf = false) const;
     bool solveBacktrackingHelper(QVector<QVector<int>> &board);
+    void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
 };
 
 #endif // SUDOKU_BACKEND_H
