@@ -1,5 +1,8 @@
 #include "sudoku_backend.h"
 
+#include <QCoreApplication>
+#include <QThread>
+
 SudokuBackend::SudokuBackend(QObject *parent)
     : QObject{parent}
 {
@@ -26,6 +29,33 @@ QList<int> SudokuBackend::board() const
 QList<int> SudokuBackend::errorCells() const
 {
     return m_errorCells;
+}
+
+bool SudokuBackend::visualize() const
+{
+    return m_visualize;
+}
+
+void SudokuBackend::setVisualize(bool v)
+{
+    if(m_visualize != v) {
+        m_visualize = v;
+        emit visualizeChanged();
+    }
+}
+
+int SudokuBackend::delay() const
+{
+    return m_delay;
+}
+
+void SudokuBackend::setDelay(int d)
+{
+    if(m_delay != d)
+    {
+        m_delay = d;
+        emit delayChanged();
+    }
 }
 
 void SudokuBackend::setCell(int index, int value)
@@ -77,12 +107,19 @@ bool SudokuBackend::isValidBoard() const
 // --- algorithm ---
 bool SudokuBackend::solveBacktracking()
 {
-    QVector<QVector<int>> tempBoard = m_board;
-    if(solveBacktrackingHelper(tempBoard)) {
-        m_board = tempBoard ;
-        emit boardChanged();
-        return true;
+    // 시각화 켜져 있으면 m_board를 직접 수정하면서 진행
+    if(m_visualize) {
+        return solveBacktrackingHelper(m_board);
+    } else {
+        // 꺼져 있으면 tempBoard 사용
+        QVector<QVector<int>> tempBoard = m_board;
+        if(solveBacktrackingHelper(tempBoard)) {
+            m_board = tempBoard ;
+            emit boardChanged();
+            return true;
+        }
     }
+
     return false;
 }
 
@@ -125,9 +162,21 @@ bool SudokuBackend::solveBacktrackingHelper(QVector<QVector<int>> &board)
                 for(int num{1}; num <= 9; ++num) {
                     if(isValid(board, r, c, num)) {
                         board[r][c] = num;
+
+                        if(m_visualize) {
+                            emit boardChanged();
+                            QThread::msleep(m_delay);
+                            QCoreApplication::processEvents();
+                        }
                         if(solveBacktrackingHelper(board))
                             return true;
+
                         board[r][c] = 0; // backtrack
+                        if(m_visualize) {
+                            emit boardChanged();
+                            QThread::msleep(m_delay);
+                            QCoreApplication::processEvents();
+                        }
                     }
                 }
                 return false;

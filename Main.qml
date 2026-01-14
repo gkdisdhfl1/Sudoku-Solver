@@ -85,7 +85,33 @@ Window {
         // 제어 버튼
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 15
+            spacing: 20
+
+            RowLayout {
+                spacing: 5
+                Text { text: "Visualize" }
+                Switch {
+                    id: visualizeSwitch
+                    checked: backend.visualize
+                    onToggled: backend.visualize = checked
+                }
+            }
+
+            RowLayout {
+                spacing: 5
+                Text { text: "Delay (ms)" }
+                Slider {
+                    id: delaySlider
+                    from: 1
+                    to: 500
+                    value: 50
+                    onValueChanged: backend.delay = value
+                }
+                Text {
+                    text: Math.floor(delaySlider.value) + "ms"
+                    Layout.preferredWidth: 40
+                }
+            }
 
             Button {
                 text: "Solve"
