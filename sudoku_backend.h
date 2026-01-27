@@ -16,6 +16,7 @@ class SudokuBackend : public QObject
     Q_PROPERTY(bool visualize READ visualize WRITE setVisualize NOTIFY visualizeChanged)
     Q_PROPERTY(int delay READ delay WRITE setDelay NOTIFY delayChanged )
     Q_PROPERTY(bool isBusy READ isBusy NOTIFY isBusyChanged ) // 작업 중 여부 표시
+    Q_PROPERTY(bool isPaused READ isPaused NOTIFY isPausedChanged)
 
     QML_ELEMENT // QML에서 직접 사용할 수 있게 등록
 public:
@@ -29,6 +30,7 @@ public:
     bool visualize() const;
     int delay() const;
     bool isBusy() const;
+    bool isPaused() const;
 
     void setVisualize(bool v);
     void setDelay(int d);
@@ -43,6 +45,7 @@ public:
     Q_INVOKABLE void solveBacktracking();
     Q_INVOKABLE void generatePuzzle(int difficulty = 0);
     Q_INVOKABLE void stop(); // 중단
+    Q_INVOKABLE void togglePause();
 
 signals:
     void boardChanged();
@@ -50,6 +53,7 @@ signals:
     void visualizeChanged();
     void delayChanged();
     void isBusyChanged();
+    void isPausedChanged();
 
 private slots:
     // 워커 시그널 처리용
@@ -64,6 +68,7 @@ private:
     bool m_visualize{false};
     int m_delay{50}; // 기본값 50ms
     bool m_isBusy{false}; // 작업 중 상태
+    bool m_isPaused{false};
 
     // 스레드 관련
     QThread* m_workerThread{nullptr};

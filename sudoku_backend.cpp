@@ -74,6 +74,11 @@ bool SudokuBackend::isBusy() const
     return m_isBusy;
 }
 
+bool SudokuBackend::isPaused() const
+{
+    return m_isPaused;
+}
+
 void SudokuBackend::setCell(int index, int value)
 {
     if(m_isBusy) return; // 작업 중엔 수정 불가
@@ -182,6 +187,18 @@ void SudokuBackend::stop()
     }
 }
 
+void SudokuBackend::togglePause()
+{
+    if(!m_worker || !m_isBusy) return;
+
+    m_isPaused = !m_isPaused; // 상태 반전
+
+    // 워커의 멤버 함수를 직접 호출 (atomic 변수 조작이므로 안전)
+    m_worker->setPaused(m_isPaused);
+
+    emit isPausedChanged();
+}
+
 // -- handler ---
 void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
 {
@@ -193,6 +210,7 @@ void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
 void SudokuBackend::handleWorkerFinished(bool success)
 {
     m_isBusy = false;
+    m_isPaused = false;
     emit isBusyChanged();
 
     m_worker = nullptr;

@@ -117,7 +117,7 @@ Window {
                     Slider {
                         id: delaySlider
                         Layout.fillWidth: true
-                        from: 0
+                        from: 1
                         to: 500
                         value: backend.delay
                         onMoved: backend.delay = value
@@ -135,15 +135,15 @@ Window {
             Layout.alignment: Qt.AlignHCenter
             spacing: 15
 
-            // Solve / Stop 토글 버튼
+            // Solve / Pause / Resume 토글 버튼
             Button {
-                text: backend.isBusy ? "Stop Solving" : "Solve Puzzle"
+                text: !backend.isBusy ? "Solve" : (backend.isPaused ? "Resume" : "Pause")
                 highlighted: !backend.isBusy
                 enabled: backend.isBusy || backend.isValidBoard()
 
                 onClicked: {
                     if(backend.isBusy) {
-                        backend.stop();
+                        backend.togglePause();
                     } else {
                         // 1. 유효성 검사
                         if(!backend.isValidBoard()) {
@@ -158,6 +158,13 @@ Window {
                         }
                     }
                 }
+            }
+
+            // Stop 버튼 (작업 중일 때만 보임)
+            Button {
+                text: "Stop"
+                visible: backend.isBusy
+                onClicked: backend.stop()
             }
 
             // Generate 퍼즐 버튼
