@@ -4,8 +4,8 @@ import QtQuick.Layouts
 import SudokuSolver
 
 Window {
-    width: 500
-    height: 650
+    width: 550
+    height: 750
     visible: true
     title: qsTr("Sudoku Solver")
 
@@ -27,6 +27,14 @@ Window {
             color: "#2c3e50"
         }
 
+        // --- 상단 상태 표시 ---
+        Text {
+            text: backend.isBusy ? "Solving puzzle..." : "Ready"
+            font.pixelSize: 14
+            color: backend.isBusy ? "#e67e22" : "#27ae60"
+            Layout.alignment: Qt.AlignHCenter
+        }
+
         // 스도쿠 그리드 (9x9)
         GridLayout {
             id: sudokuGrid
@@ -34,6 +42,9 @@ Window {
             rowSpacing: 0
             columnSpacing: 0
             Layout.alignment: Qt.AlignHCenter
+
+            // 작업 중일 때 그리드 조작 방지
+            enabled: !backend.isBusy
 
             Repeater {
                 model: backend.board
@@ -49,8 +60,8 @@ Window {
                     // 백엔드의 errorCells 리스트에 현재 인덱스가 포함되어 있는지  확인
                     readonly property bool isError: backend.errorCells.includes(index);
 
-                    implicitWidth: 45
-                    implicitHeight: 45
+                    implicitWidth: 48
+                    implicitHeight: 48
 
                     color: isError ? "#ffcccc" : (isDarkBlock ? "#ecf0f1" : "#ffffff")
                     border.color: "#bdc3c7"
@@ -59,7 +70,7 @@ Window {
                     TextField {
                         anchors.fill: parent
                         text: modelData === 0 ? "" : modelData.toString()
-                        font.pixelSize: 22
+                        font.pixelSize: 24
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         background: null
@@ -82,57 +93,94 @@ Window {
             }
         }
 
+        // --- 시각화 설정 ---
+        GroupBox {
+            title: "Visualization Settings"
+            Layout.fillWidth: true
+            enabled: !backend.isBusy // 실행 중엔 설정 변경 금지
+
+            RowLayout {
+                anchors.fill: parent
+                spacing: 20
+
+                RowLayout {
+                    Text { text: "Visualize" }
+                    Switch {
+                        checked: backend.visualize
+                        onToggled: backend.visualize = checked
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Speed" }
+                    Slider {
+                        id: delaySlider
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 500
+                        value: backend.delay
+                        onMoved: backend.delay = value
+                    }
+                    Text {
+                        text: Math.floor(delaySlider.value) + "ms"
+                        Layout.preferredWidth: 40
+                    }
+                }
+            }
+        }
+
         // 제어 버튼
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 20
+            spacing: 15
 
-            RowLayout {
-                spacing: 5
-                Text { text: "Visualize" }
-                Switch {
-                    id: visualizeSwitch
-                    checked: backend.visualize
-                    onToggled: backend.visualize = checked
-                }
-            }
-
-            RowLayout {
-                spacing: 5
-                Text { text: "Delay (ms)" }
-                Slider {
-                    id: delaySlider
-                    from: 1
-                    to: 500
-                    value: 50
-                    onValueChanged: backend.delay = value
-                }
-                Text {
-                    text: Math.floor(delaySlider.value) + "ms"
-                    Layout.preferredWidth: 40
-                }
-            }
-
+            // Solve / Stop 토글 버튼
             Button {
-                text: "Solve"
-                highlighted: true
-                onClicked: {
-                    // 1. 유효성 검사
-                    if(!backend.isValidBoard()) {
-                        console.log("Invalid board configuration!");
-                        // todo: 나중에 팝업 등으로 사용자에게 알림
-                        return;
-                    }
+                text: backend.isBusy ? "Stop Solving" : "Solve Puzzle"
+                highlighted: !backend.isBusy
+                enabled: backend.isBusy || backend.isValidBoard()
 
-                    // 2. 풀이 시도
-                    if(!backend.solveBacktracking()) {
-                        console.log("Solution not found");
+                onClicked: {
+                    if(backend.isBusy) {
+                        backend.stop();
+                    } else {
+                        // 1. 유효성 검사
+                        if(!backend.isValidBoard()) {
+                            console.log("Invalid board configuration!");
+                            // todo: 나중에 팝업 등으로 사용자에게 알림
+                            return;
+                        }
+
+                        // 2. 풀이 시도
+                        if(!backend.solveBacktracking()) {
+                            console.log("Solution not found");
+                        }
                     }
+                }
+            }
+
+            // Generate 퍼즐 버튼
+            RowLayout {
+                spacing: 5
+                enabled: !backend.isBusy
+
+                ComboBox {
+                    id: difficultyCombo
+                    model: ["Easy", "Medium", "Hard"]
+                    currentIndex: 0
+                    width: 100
+                }
+
+                Button {
+                    text: "Generate"
+                    onClicked: backend.generatePuzzle(difficultyCombo.currentIndex);
                 }
             }
 
             Button {
                 text: "Clear"
+                enabled: !backend.isBusy
                 onClicked: backend.clear()
             }
         }

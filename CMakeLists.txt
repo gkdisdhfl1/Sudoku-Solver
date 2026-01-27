@@ -17,6 +17,8 @@ qt_add_qml_module(appSudokuSolver
     QML_FILES
         Main.qml
         SOURCES sudoku_backend.cpp
+        SOURCES sudoku_solver.h sudoku_solver.cpp
+        SOURCES solver_worker.h solver_worker.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
