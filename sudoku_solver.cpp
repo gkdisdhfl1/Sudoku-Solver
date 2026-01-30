@@ -56,8 +56,8 @@ void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
     QVector<int> indices(81);
     std::iota(indices.begin(), indices.end(), 0);
 
-    static std::random_device rd;
-    static std::mt19937 g(rd());
+    thread_local std::random_device rd;
+    thread_local std::mt19937 g(rd());
     std::shuffle(indices.begin(), indices.end(), g);
 
     for(int i{0}; i < removeCount; ++i) {

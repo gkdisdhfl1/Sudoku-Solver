@@ -54,6 +54,7 @@ signals:
     void delayChanged();
     void isBusyChanged();
     void isPausedChanged();
+    void solveFinished(bool success);
 
 private slots:
     // 워커 시그널 처리용

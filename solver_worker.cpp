@@ -20,6 +20,9 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
 void SolverWorker::requestStop()
 {
     m_stopRequested = true;
+
+    // 잠자고 있을 수도 있는 스레드를 강제로 깨워 중단 요청을 확인하게 함
+    m_pauseCondition.wakeAll();
 }
 
 void SolverWorker::process()
