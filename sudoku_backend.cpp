@@ -212,14 +212,14 @@ void SudokuBackend::handleWorkerFinished(bool success)
     m_isBusy = false;
     m_isPaused = false;
     emit isBusyChanged();
+    emit isPausedChanged();
 
     m_worker = nullptr;
     m_workerThread = nullptr; // deleteLater로 삭제되므로 포인터만 null 처리
 
-    if(!success) {
-        // 실패 처리
-    }
     checkErrors(); // 최종 상태 에러 검사
+
+    emit solveFinished(success);
 }
 
 //  --- private ---
