@@ -76,6 +76,7 @@ private:
     SolverWorker* m_worker{nullptr};
 
     void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
+    void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
 };
 
 #endif // SUDOKU_BACKEND_H

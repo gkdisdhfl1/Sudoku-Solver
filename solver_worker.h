@@ -45,6 +45,8 @@ private:
     QMutex m_pauseMutex;
     QWaitCondition m_pauseCondition;
     std::atomic_bool m_isPaused{false};
+
+    bool processStep(const QVector<QVector<int>>& currentBoard);
 };
 
 #endif // SOLVER_WORKER_H

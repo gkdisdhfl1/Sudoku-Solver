@@ -37,30 +37,7 @@ void SolverWorker::process()
             // 람다 함수로 시각화 로직 주입
             success = solver.solve(m_board, SolveAlgorithm::BackTracking,
                                    [this](const QVector<QVector<int>>& currentBoard) -> bool {
-                                       if(m_stopRequested) return false; // 중단 요청
-
-                                       // --- 일시 정지 로직 ---
-                                       if(m_isPaused) {
-                                           QMutexLocker locker(&m_pauseMutex); // 뮤텍스 잠금
-                                           // paused 상태가 풀릴 때까지 대기 (여기서 스레드 멈춤)
-                                           while(m_isPaused) {
-                                               // 스레드 종료 요청이 오면 대기 풀고 나가야 함
-                                               if(m_stopRequested) return false;
-                                               m_pauseCondition.wait(&m_pauseMutex);
-                                           }
-                                       }
-                                       // --------------------
-
-                                       // Throttling: 딜레이 짧을 경우 16ms 간격 제한
-                                       if(m_delay > 10 || m_updateTimer.elapsed() >= 16) {
-                                           emit boardUpdated(currentBoard);
-                                           m_updateTimer.restart();
-                                       }
-
-                                       if(m_delay > 0)
-                                           QThread::msleep(m_delay);
-
-                                        return true; // 계속 진행
+                                       return processStep(currentBoard);
                                     }
                         );
             // 루프가 끝난 후 마지막 상태는 반드시 업데이트 (누락 방지)
@@ -91,4 +68,36 @@ void SolverWorker::setPaused(bool paused)
         // 재개할 때는 잠자던 스레드를 깨워줌
         m_pauseCondition.wakeAll();
     }
+}
+
+bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
+{
+    if(m_stopRequested) return false;
+
+    // 1. 일시 정지 (Pause) 처리
+    if(m_isPaused) {
+        QMutexLocker locker(&m_pauseMutex);
+        while (m_isPaused) {
+            if(m_stopRequested) return false;
+            if(m_stopRequested) return false;
+            m_pauseCondition.wait(&m_pauseMutex);
+        }
+    }
+
+    // 2. UI 갱싱 (Throttling)
+    if(m_delay > 10 || m_updateTimer.elapsed() >= 16) {
+        emit boardUpdated(currentBoard);
+        m_updateTimer.restart();
+    }
+
+    // 3. 지연 (Smart Sleep)
+    if(m_delay > 0) {
+        QMutexLocker locker(&m_pauseMutex);
+        // m_delay 만큼 대기하되 requestStop()이 wakeAll()을 부르면 즉시 깨어남
+        if(!m_stopRequested) { // 이미 stop 요청이 왔다면 잘 필요 없음
+            m_pauseCondition.wait(&m_pauseMutex, m_delay);
+        }
+    }
+
+    return true; // 계속 진행
 }
