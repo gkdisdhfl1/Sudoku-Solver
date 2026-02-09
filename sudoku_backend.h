@@ -54,6 +54,7 @@ signals:
     void delayChanged();
     void isBusyChanged();
     void isPausedChanged();
+    void solveFinished(bool success);
 
 private slots:
     // 워커 시그널 처리용
@@ -75,6 +76,7 @@ private:
     SolverWorker* m_worker{nullptr};
 
     void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
+    void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
 };
 
 #endif // SUDOKU_BACKEND_H

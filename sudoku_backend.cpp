@@ -130,16 +130,19 @@ bool SudokuBackend::isValidBoard() const
 }
 
 // --- 메인 기능 ---
-void SudokuBackend::solveBacktracking()
+void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
 {
-    if(m_isBusy) return;
-
     m_isBusy = true;
     emit isBusyChanged();
 
     m_workerThread = new QThread;
+
+    // JobType에 따라 인자가 다르지만, SolverWorker 생성자 활용
+    bool visualize = (jobType == SolverWorker::JobType::Solve) ? m_visualize : false;
+    int delay = (jobType == SolverWorker::JobType::Solve) ? m_delay : 0;
+
     // Worker 생성 (Solve 모드)
-    m_worker = new SolverWorker(m_board, SolverWorker::JobType::Solve, m_visualize, m_delay);
+    m_worker = new SolverWorker(m_board, jobType, visualize, delay, difficulty);
     m_worker->moveToThread(m_workerThread);
 
     // 시그널 연결
@@ -156,26 +159,22 @@ void SudokuBackend::solveBacktracking()
     m_workerThread->start();
 }
 
+void SudokuBackend::solveBacktracking()
+{
+    if(m_isBusy) return;
+    if(!isValidBoard()) {
+        emit solveFinished(false);
+        return;
+    }
+
+    startWorker(SolverWorker::JobType::Solve);
+}
+
 void SudokuBackend::generatePuzzle(int difficulty)
 {
     if(m_isBusy) return;
 
-    m_isBusy = true;
-    emit isBusyChanged();
-
-    m_workerThread = new QThread;
-    // Worker 생성 (Generate 모드)
-    m_worker = new SolverWorker(m_board, SolverWorker::JobType::Generate, false, 0, difficulty); // 생성은 시각화 없이 즉시 수행
-    m_worker->moveToThread(m_workerThread);
-
-    // 시그널 연결
-    connect(m_workerThread, &QThread::started, m_worker, &SolverWorker::process);
-    connect(m_worker, &SolverWorker::boardUpdated, this, &SudokuBackend::handleBoardUpdate);
-    connect(m_worker, &SolverWorker::finished, this, &SudokuBackend::handleWorkerFinished);
-    connect(m_worker, &SolverWorker::finished, m_worker, &SolverWorker::deleteLater);
-    connect(m_workerThread, &QThread::finished, m_workerThread, &QThread::deleteLater);
-
-    m_workerThread->start();
+    startWorker(SolverWorker::JobType::Generate, difficulty);
 }
 
 void SudokuBackend::stop()
@@ -212,14 +211,14 @@ void SudokuBackend::handleWorkerFinished(bool success)
     m_isBusy = false;
     m_isPaused = false;
     emit isBusyChanged();
+    emit isPausedChanged();
 
     m_worker = nullptr;
     m_workerThread = nullptr; // deleteLater로 삭제되므로 포인터만 null 처리
 
-    if(!success) {
-        // 실패 처리
-    }
     checkErrors(); // 최종 상태 에러 검사
+
+    emit solveFinished(success);
 }
 
 //  --- private ---

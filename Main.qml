@@ -12,6 +12,16 @@ Window {
     // 백엔드 인스턴스
     SudokuBackend {
         id: backend
+
+        // 비동기로 전달되는 결과를 여기서 처리
+        onSolveFinished: (success) => {
+                             if(!success) {
+                                 console.log("Solution not found");
+                                 // 나중에 알림 팝업 띄우는 로직 추가
+                             } else {
+                                 console.log("Puzzle solved!");
+                             }
+                         }
     }
 
     ColumnLayout {
@@ -139,23 +149,13 @@ Window {
             Button {
                 text: !backend.isBusy ? "Solve" : (backend.isPaused ? "Resume" : "Pause")
                 highlighted: !backend.isBusy
-                enabled: backend.isBusy || backend.isValidBoard()
+                enabled: backend.isBusy || backend.errorCells.length === 0
 
                 onClicked: {
                     if(backend.isBusy) {
                         backend.togglePause();
                     } else {
-                        // 1. 유효성 검사
-                        if(!backend.isValidBoard()) {
-                            console.log("Invalid board configuration!");
-                            // todo: 나중에 팝업 등으로 사용자에게 알림
-                            return;
-                        }
-
-                        // 2. 풀이 시도
-                        if(!backend.solveBacktracking()) {
-                            console.log("Solution not found");
-                        }
+                        backend.solveBacktracking();
                     }
                 }
             }
