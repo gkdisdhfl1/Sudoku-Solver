@@ -3,6 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import SudokuSolver
 
+pragma ComponentBehavior: Bound
+
 Window {
     width: 550
     height: 750
@@ -14,14 +16,14 @@ Window {
         id: backend
 
         // 비동기로 전달되는 결과를 여기서 처리
-        onSolveFinished: (success) => {
-                             if(!success) {
-                                 console.log("Solution not found");
-                                 // 나중에 알림 팝업 띄우는 로직 추가
-                             } else {
-                                 console.log("Puzzle solved!");
-                             }
-                         }
+        onSolveFinished: success => {
+            if (!success) {
+                console.log("Solution not found");
+                // 나중에 알림 팝업 띄우는 로직 추가
+            } else {
+                console.log("Puzzle solved!");
+            }
+        }
     }
 
     ColumnLayout {
@@ -59,6 +61,10 @@ Window {
             Repeater {
                 model: backend.board
                 delegate: Rectangle {
+                    id: cell
+
+                    required property int index
+                    required property int modelData
                     readonly property int row: Math.floor(index / 9)
                     readonly property int col: index % 9
                     readonly property int blockRow: Math.floor(row / 3)
@@ -68,7 +74,7 @@ Window {
                     readonly property bool isDarkBlock: (blockRow + blockCol) % 2 !== 0
 
                     // 백엔드의 errorCells 리스트에 현재 인덱스가 포함되어 있는지  확인
-                    readonly property bool isError: backend.errorCells.includes(index);
+                    readonly property bool isError: backend.errorCells.includes(index)
 
                     implicitWidth: 48
                     implicitHeight: 48
@@ -79,22 +85,25 @@ Window {
 
                     TextField {
                         anchors.fill: parent
-                        text: modelData === 0 ? "" : modelData.toString()
+                        text: cell.modelData === 0 ? "" : cell.modelData.toString()
                         font.pixelSize: 24
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         background: null
                         selectByMouse: true
-                        color: isError ? "red" : "black" // 에러 시 글자색 빨강
+                        color: cell.isError ? "red" : "black" // 에러 시 글자색 빨강
 
                         // 1~9 정수만 입력 가능
-                        validator: IntValidator { bottom: 1; top: 9 }
+                        validator: IntValidator {
+                            bottom: 1
+                            top: 9
+                        }
                         inputMethodHints: Qt.ImhDigitsOnly
 
                         // 텍스트가 수정될 때 백엔드 업데이트
                         onTextEdited: {
                             let val = parseInt(text);
-                            backend.setCell(index, isNaN(val) ? 0 : val);
+                            backend.setCell(cell.index, isNaN(val) ? 0 : val);
                         }
                     }
 
@@ -114,7 +123,9 @@ Window {
                 spacing: 20
 
                 RowLayout {
-                    Text { text: "Visualize" }
+                    Text {
+                        text: "Visualize"
+                    }
                     Switch {
                         checked: backend.visualize
                         onToggled: backend.visualize = checked
@@ -123,7 +134,9 @@ Window {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Text { text: "Speed" }
+                    Text {
+                        text: "Speed"
+                    }
                     Slider {
                         id: delaySlider
                         Layout.fillWidth: true
@@ -152,7 +165,7 @@ Window {
                 enabled: backend.isBusy || backend.errorCells.length === 0
 
                 onClicked: {
-                    if(backend.isBusy) {
+                    if (backend.isBusy) {
                         backend.togglePause();
                     } else {
                         backend.solveBacktracking();
@@ -181,7 +194,7 @@ Window {
 
                 Button {
                     text: "Generate"
-                    onClicked: backend.generatePuzzle(difficultyCombo.currentIndex);
+                    onClicked: backend.generatePuzzle(difficultyCombo.currentIndex)
                 }
             }
 
