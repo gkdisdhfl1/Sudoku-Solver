@@ -35,16 +35,19 @@ void SolverWorker::process()
             m_updateTimer.start(); // 타이머 시작
 
             // 람다 함수로 시각화 로직 주입
-            success = solver.solve(m_board, SolveAlgorithm::BackTracking,
-                                   [this](const QVector<QVector<int>>& currentBoard) -> bool {
-                                       return processStep(currentBoard);
-                                    }
-                        );
+            SovleResult result = solver.solve(m_board, SolveAlgorithm::BackTracking,
+                                                [this](const QVector<QVector<int>>& currentBoard) -> bool {
+                                                    return processStep(currentBoard);
+                                                });
+            success = (result == SovleResult::Success);
+
             // 루프가 끝난 후 마지막 상태는 반드시 업데이트 (누락 방지)
             emit boardUpdated(m_board);
         } else {
             // 콜백 없이 실행
-            success = solver.solve(m_board);
+            SovleResult result = solver.solve(m_board);
+            success = (result == SovleResult::Success);
+
             if(success)
                 emit boardUpdated(m_board);
         }
@@ -78,7 +81,6 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     if(m_isPaused) {
         QMutexLocker locker(&m_pauseMutex);
         while (m_isPaused) {
-            if(m_stopRequested) return false;
             if(m_stopRequested) return false;
             m_pauseCondition.wait(&m_pauseMutex);
         }

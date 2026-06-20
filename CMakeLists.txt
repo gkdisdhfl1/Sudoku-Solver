@@ -18,7 +18,7 @@ qt_add_qml_module(appSudokuSolver
     URI SudokuSolver
     QML_FILES
         Main.qml
-        SOURCES sudoku_backend.cpp
+        SOURCES sudoku_backend.h sudoku_backend.cpp
         SOURCES sudoku_solver.h sudoku_solver.cpp
         SOURCES solver_worker.h solver_worker.cpp
 )

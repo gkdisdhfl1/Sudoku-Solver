@@ -82,3 +82,5 @@ CMakeLists.txt.user*
 /build*/
 .gemini
 .qmlls.ini
+.qtcreator/
+.vscode/

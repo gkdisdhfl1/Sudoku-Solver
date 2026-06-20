@@ -2,14 +2,12 @@
 #define SUDOKU_BACKEND_H
 
 #include "solver_worker.h"
-#include <QObject>
+#include <QAbstractListModel>
 #include <QtQml/qqmlregistration.h>
 
-class SudokuBackend : public QObject
+class SudokuBackend : public QAbstractListModel
 {
     Q_OBJECT
-    // QML에서 접근할 때 사용할 1차원 형태의 프로퍼티
-    Q_PROPERTY(QList<int> board READ board NOTIFY boardChanged)
     Q_PROPERTY(QList<int> errorCells READ errorCells NOTIFY errorCellsChanged)
 
     // 시각화 관련 프로퍼티
@@ -23,7 +21,14 @@ public:
     explicit SudokuBackend(QObject *parent = nullptr);
     ~SudokuBackend(); // 소멸자 추가 (스레드 정리용)
 
-    QList<int> board() const;
+    // QAbstractListModel 인터페이스 오버라이드
+    enum BoardRoles {
+        ValueRole = Qt::UserRole + 1
+    };
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
+
     QList<int> errorCells() const;
 
     // 시각화 Getter/Setter
@@ -48,7 +53,6 @@ public:
     Q_INVOKABLE void togglePause();
 
 signals:
-    void boardChanged();
     void errorCellsChanged();
     void visualizeChanged();
     void delayChanged();
