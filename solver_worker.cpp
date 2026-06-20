@@ -19,6 +19,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
 
 void SolverWorker::requestStop()
 {
+    QMutexLocker locker(&m_pauseMutex);
     m_stopRequested = true;
 
     // 잠자고 있을 수도 있는 스레드를 강제로 깨워 중단 요청을 확인하게 함
@@ -69,6 +70,8 @@ void SolverWorker::process()
 
 void SolverWorker::setPaused(bool paused)
 {
+    QMutexLocker locker(&m_pauseMutex);
+
     // 이미 같은 상태면 무시
     if(m_isPaused == paused) return;
 

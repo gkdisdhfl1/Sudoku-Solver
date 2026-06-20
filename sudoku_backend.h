@@ -4,6 +4,7 @@
 #include "solver_worker.h"
 #include <QAbstractListModel>
 #include <QtQml/qqmlregistration.h>
+#include <QPointer>
 
 class SudokuBackend : public QAbstractListModel
 {
@@ -76,8 +77,8 @@ private:
     bool m_isPaused{false};
 
     // 스레드 관련
-    QThread* m_workerThread{nullptr};
-    SolverWorker* m_worker{nullptr};
+    QPointer<QThread> m_workerThread{nullptr};
+    QPointer<SolverWorker> m_worker{nullptr};
 
     void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
     void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수

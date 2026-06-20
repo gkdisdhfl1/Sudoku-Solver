@@ -227,10 +227,8 @@ void SudokuBackend::togglePause()
 // -- handler ---
 void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
 {
-    // 비동기 탐색이나 퍼즐 생성에 의해 보드가 전체 갱신될 때도 모델 리셋을 수행
-    beginResetModel();
     m_board = board;
-    endResetModel();
+    emit dataChanged(index(0, 0), index(80, 0));
 }
 
 void SudokuBackend::handleWorkerFinished(bool success)
