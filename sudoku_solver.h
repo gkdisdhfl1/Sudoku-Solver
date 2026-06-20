@@ -9,7 +9,7 @@ enum class SolveAlgorithm {
 };
 
 // 성공 실패, 사용자에 의한 중단을 구분하기 위한 리턴 타입 정의
-enum class SovleResult {
+enum class SolveResult {
     Success,
     Failed,
     Aborted
@@ -27,7 +27,7 @@ public:
 
     // 백트래킹 풀이
     // callback이 nullptr이면 일반 실행, 있으면 매 단계 호출
-    SovleResult solve(QVector<QVector<int>> &board,
+    SolveResult solve(QVector<QVector<int>> &board,
                SolveAlgorithm algorithm = SolveAlgorithm::BackTracking,
                StepCallback callback = nullptr);
 
@@ -35,7 +35,7 @@ public:
     void generate(QVector<QVector<int>> &board, int difficulty);
 
 private:
-    SovleResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback  );
+    SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback  );
 
     bool solveRandomly(QVector<QVector<int>> &board);
 };

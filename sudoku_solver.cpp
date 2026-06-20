@@ -1,5 +1,6 @@
 #include "sudoku_solver.h"
 #include <random>
+#include <functional>
 
 SudokuSolver::SudokuSolver() {}
 
@@ -32,7 +33,7 @@ bool SudokuSolver::isValid(const QVector<QVector<int>> &board, int r, int c, int
     return true;
 }
 
-SovleResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
+SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
 {
     switch (algorithm) {
     case SolveAlgorithm::BackTracking:
@@ -68,7 +69,7 @@ void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
 
 // --- private ---
 
-SovleResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCallback callback)
+SolveResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCallback callback)
 {
     for(int r = 0; r < 9; ++r) {
         for(int c = 0; c < 9; ++c) {
@@ -81,33 +82,33 @@ SovleResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCa
                         if(callback) {
                             if(!callback(board)) {
                                 board[r][c] = 0; // 중단 즉시 자신이 넣었던 값을 0으로 리셋
-                                return SovleResult::Aborted; // 사용자가 중단 요청
+                                return SolveResult::Aborted; // 사용자가 중단 요청
                             }
                         }
 
-                        SovleResult result = solveBacktracking(board, callback);
-                        if(result == SovleResult::Success)
-                            return SovleResult::Success;
+                        SolveResult result = solveBacktracking(board, callback);
+                        if(result == SolveResult::Success)
+                            return SolveResult::Success;
 
                         // 실패했거나 중단되었으므로 대입한 값을 0으로 원상 복구
                         board[r][c] = 0;
 
                         // 중단 상태라면 다음 루프를 돌지 안고 즉시 상위 스택으로 전파
-                        if(result == SovleResult::Aborted)
-                            return SovleResult::Aborted;
+                        if(result == SolveResult::Aborted)
+                            return SolveResult::Aborted;
 
                         // 시각화 및 중단 훅 (지울 때)
                         if(callback) {
                             if(!callback(board))
-                                return SovleResult::Aborted; // 중단 즉시 반환
+                                return SolveResult::Aborted; // 중단 즉시 반환
                         }
                     }
                 }
-                return SovleResult::Failed;
+                return SolveResult::Failed;
             }
         }
     }
-    return SovleResult::Success;
+    return SolveResult::Success;
 }
 
 bool SudokuSolver::solveRandomly(QVector<QVector<int>> &board)

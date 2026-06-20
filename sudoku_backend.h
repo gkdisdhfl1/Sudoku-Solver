@@ -47,7 +47,7 @@ public:
     Q_INVOKABLE bool isValidBoard() const;
 
     // 메인 기능
-    Q_INVOKABLE void solveBacktracking();
+    Q_INVOKABLE void solve();
     Q_INVOKABLE void generatePuzzle(int difficulty = 0);
     Q_INVOKABLE void stop(); // 중단
     Q_INVOKABLE void togglePause();

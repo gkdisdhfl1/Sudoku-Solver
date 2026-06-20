@@ -185,7 +185,7 @@ void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
     m_workerThread->start();
 }
 
-void SudokuBackend::solveBacktracking()
+void SudokuBackend::solve()
 {
     if(m_isBusy) return;
     if(!isValidBoard()) {

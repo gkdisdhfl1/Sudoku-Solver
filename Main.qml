@@ -168,7 +168,7 @@ Window {
                     if (backend.isBusy) {
                         backend.togglePause();
                     } else {
-                        backend.solveBacktracking();
+                        backend.solve();
                     }
                 }
             }
