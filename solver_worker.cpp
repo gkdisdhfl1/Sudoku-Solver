@@ -46,17 +46,14 @@ void SolverWorker::process()
 
             // 시각화 전용 콜백 주입
             result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
-
-            // 루프가 끝난 후 마지막 상태는 반드시 업데이트 (누락 방지)
-            emit boardUpdated(m_board);
         } else {
             // 비시각화 중단용 콜백 주입
             result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
         }
 
-        // 성공 여부 판단 및 최종 보드 업데이트
+        // 성공 여부 판단 및 최종 보드 업데이트 (시각화/비시각화 공통)
         bool success = (result == SolveResult::Success);
-        if (success) {
+        if (success || m_visualize) {
             emit boardUpdated(m_board);
         }
         emit finished(success);

@@ -100,13 +100,13 @@ bool SudokuBackend::isPaused() const
     return m_isPaused;
 }
 
-void SudokuBackend::setCell(int index, int value)
+void SudokuBackend::setCell(int cellIndex, int value)
 {
     if(m_isBusy) return; // 작업 중엔 수정 불가
 
-    if(index < 0 || index >= 81) return;
-    int r = index / 9;
-    int c = index % 9;
+    if(cellIndex < 0 || cellIndex >= 81) return;
+    int r = cellIndex / 9;
+    int c = cellIndex % 9;
 
     if(value < 0 || value > 9) return;
 
@@ -114,7 +114,7 @@ void SudokuBackend::setCell(int index, int value)
         m_board[r][c] = value;
 
         // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
-        QModelIndex modelIdx = this->index(index, 0);
+        QModelIndex modelIdx = index(cellIndex, 0);
         emit dataChanged(modelIdx, modelIdx);
 
         // 값이 바뀔 때마다 에러 상태 갱신

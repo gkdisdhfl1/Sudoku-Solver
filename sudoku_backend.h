@@ -42,7 +42,7 @@ public:
     void setDelay(int d);
 
 
-    Q_INVOKABLE void setCell(int index, int value);
+    Q_INVOKABLE void setCell(int cellIndex, int value);
     // Q_INVOKABLE int getCell(int index) const;
     Q_INVOKABLE void clear();
     Q_INVOKABLE bool isValidBoard() const;
