@@ -1,6 +1,5 @@
 #include "sudoku_solver.h"
 #include <random>
-#include <functional>
 
 SudokuSolver::SudokuSolver() {}
 
@@ -93,7 +92,7 @@ SolveResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCa
                         // 실패했거나 중단되었으므로 대입한 값을 0으로 원상 복구
                         board[r][c] = 0;
 
-                        // 중단 상태라면 다음 루프를 돌지 안고 즉시 상위 스택으로 전파
+                        // 중단 상태라면 다음 루프를 돌지 않고 즉시 상위 스택으로 전파
                         if(result == SolveResult::Aborted)
                             return SolveResult::Aborted;
 

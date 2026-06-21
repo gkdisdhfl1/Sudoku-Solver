@@ -2,6 +2,7 @@
 #define SUDOKU_SOLVER_H
 
 #include <QVector>
+#include <functional>
 
 enum class SolveAlgorithm {
     BackTracking,
