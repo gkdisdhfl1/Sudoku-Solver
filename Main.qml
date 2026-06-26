@@ -59,12 +59,12 @@ Window {
             enabled: !backend.isBusy
 
             Repeater {
-                model: backend.board
+                model: backend
                 delegate: Rectangle {
                     id: cell
 
                     required property int index
-                    required property int modelData
+                    required property int value // display 롤에 바인딩된 변수
                     readonly property int row: Math.floor(index / 9)
                     readonly property int col: index % 9
                     readonly property int blockRow: Math.floor(row / 3)
@@ -85,7 +85,7 @@ Window {
 
                     TextField {
                         anchors.fill: parent
-                        text: cell.modelData === 0 ? "" : cell.modelData.toString()
+                        text: cell.value === 0 ? "" : cell.value.toString()
                         font.pixelSize: 24
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -168,7 +168,7 @@ Window {
                     if (backend.isBusy) {
                         backend.togglePause();
                     } else {
-                        backend.solveBacktracking();
+                        backend.solve();
                     }
                 }
             }

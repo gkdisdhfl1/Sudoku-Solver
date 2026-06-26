@@ -2,14 +2,13 @@
 #define SUDOKU_BACKEND_H
 
 #include "solver_worker.h"
-#include <QObject>
+#include <QAbstractListModel>
 #include <QtQml/qqmlregistration.h>
+#include <QPointer>
 
-class SudokuBackend : public QObject
+class SudokuBackend : public QAbstractListModel
 {
     Q_OBJECT
-    // QML에서 접근할 때 사용할 1차원 형태의 프로퍼티
-    Q_PROPERTY(QList<int> board READ board NOTIFY boardChanged)
     Q_PROPERTY(QList<int> errorCells READ errorCells NOTIFY errorCellsChanged)
 
     // 시각화 관련 프로퍼티
@@ -23,7 +22,14 @@ public:
     explicit SudokuBackend(QObject *parent = nullptr);
     ~SudokuBackend(); // 소멸자 추가 (스레드 정리용)
 
-    QList<int> board() const;
+    // QAbstractListModel 인터페이스 오버라이드
+    enum BoardRoles {
+        ValueRole = Qt::UserRole + 1
+    };
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
+
     QList<int> errorCells() const;
 
     // 시각화 Getter/Setter
@@ -36,19 +42,18 @@ public:
     void setDelay(int d);
 
 
-    Q_INVOKABLE void setCell(int index, int value);
+    Q_INVOKABLE void setCell(int cellIndex, int value);
     // Q_INVOKABLE int getCell(int index) const;
     Q_INVOKABLE void clear();
     Q_INVOKABLE bool isValidBoard() const;
 
     // 메인 기능
-    Q_INVOKABLE void solveBacktracking();
+    Q_INVOKABLE void solve();
     Q_INVOKABLE void generatePuzzle(int difficulty = 0);
     Q_INVOKABLE void stop(); // 중단
     Q_INVOKABLE void togglePause();
 
 signals:
-    void boardChanged();
     void errorCellsChanged();
     void visualizeChanged();
     void delayChanged();
@@ -72,8 +77,8 @@ private:
     bool m_isPaused{false};
 
     // 스레드 관련
-    QThread* m_workerThread{nullptr};
-    SolverWorker* m_worker{nullptr};
+    QPointer<QThread> m_workerThread{nullptr};
+    QPointer<SolverWorker> m_worker{nullptr};
 
     void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
     void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수

@@ -19,6 +19,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
 
 void SolverWorker::requestStop()
 {
+    QMutexLocker locker(&m_pauseMutex);
     m_stopRequested = true;
 
     // 잠자고 있을 수도 있는 스레드를 강제로 깨워 중단 요청을 확인하게 함
@@ -28,37 +29,46 @@ void SolverWorker::requestStop()
 void SolverWorker::process()
 {
     SudokuSolver solver;
-    bool success{false};
+    SolveResult result;
+
+    // 역할에 따른 두 개의 콜백 변수 정의
+    auto stopOnlyCallback = [this](const QVector<QVector<int>>&) -> bool {
+        return !m_stopRequested;
+    };
+
+    auto visualizeCallback = [this](const QVector<QVector<int>>& board) -> bool {
+        return processStep(board);
+    };
 
     if(m_jobType == JobType::Solve) {
         if(m_visualize) {
             m_updateTimer.start(); // 타이머 시작
 
-            // 람다 함수로 시각화 로직 주입
-            success = solver.solve(m_board, SolveAlgorithm::BackTracking,
-                                   [this](const QVector<QVector<int>>& currentBoard) -> bool {
-                                       return processStep(currentBoard);
-                                    }
-                        );
-            // 루프가 끝난 후 마지막 상태는 반드시 업데이트 (누락 방지)
-            emit boardUpdated(m_board);
+            // 시각화 전용 콜백 주입
+            result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
         } else {
-            // 콜백 없이 실행
-            success = solver.solve(m_board);
-            if(success)
-                emit boardUpdated(m_board);
+            // 비시각화 중단용 콜백 주입
+            result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
         }
+
+        // 성공 여부 판단 및 최종 보드 업데이트 (시각화/비시각화 공통)
+        bool success = (result == SolveResult::Success);
+        if (success || m_visualize) {
+            emit boardUpdated(m_board);
+        }
+        emit finished(success);
+
     } else if(m_jobType == JobType::Generate) {
         solver.generate(m_board, m_difficulty);
         emit boardUpdated(m_board);
-        success = true;
+        emit finished(true);
     }
-
-    emit finished(success);
 }
 
 void SolverWorker::setPaused(bool paused)
 {
+    QMutexLocker locker(&m_pauseMutex);
+
     // 이미 같은 상태면 무시
     if(m_isPaused == paused) return;
 
@@ -78,7 +88,6 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     if(m_isPaused) {
         QMutexLocker locker(&m_pauseMutex);
         while (m_isPaused) {
-            if(m_stopRequested) return false;
             if(m_stopRequested) return false;
             m_pauseCondition.wait(&m_pauseMutex);
         }

@@ -6,7 +6,7 @@
 #include <QThread>
 
 SudokuBackend::SudokuBackend(QObject *parent)
-    : QObject{parent}
+    : QAbstractListModel{parent}
 {
     m_board.resize(9);
     for(int i{0}; i < 9; ++i) {
@@ -24,17 +24,38 @@ SudokuBackend::~SudokuBackend()
     }
 }
 
-// 2차원 데이터를 QML UI 전용 1차원 리스트(Flatten)로 변환
-QList<int> SudokuBackend::board() const
+int SudokuBackend::rowCount(const QModelIndex &parent) const
 {
-    QList<int> flatList;
-    flatList.reserve(81);
-    for(const auto& row : m_board) {
-        for(int val : row) {
-            flatList.append(val);
-        }
+    if (parent.isValid())
+        return 0;
+    
+    return 81; // 9x9 스도쿠 판 크기
+}
+
+QVariant SudokuBackend::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid())
+        return QVariant();
+    
+    int idx = index.row();
+    if (idx < 0 || idx >= 81)
+        return QVariant();
+
+    int r = idx / 9;
+    int c = idx % 9;
+
+    if (role == Qt::DisplayRole || role == ValueRole) {
+        return m_board[r][c];
     }
-    return flatList;
+
+    return QVariant();
+}
+
+QHash<int, QByteArray> SudokuBackend::roleNames() const
+{
+    QHash<int, QByteArray> roles;
+    roles[ValueRole] = "value";
+    return roles;
 }
 
 QList<int> SudokuBackend::errorCells() const
@@ -79,19 +100,22 @@ bool SudokuBackend::isPaused() const
     return m_isPaused;
 }
 
-void SudokuBackend::setCell(int index, int value)
+void SudokuBackend::setCell(int cellIndex, int value)
 {
     if(m_isBusy) return; // 작업 중엔 수정 불가
 
-    if(index < 0 || index >= 81) return;
-    int r = index / 9;
-    int c = index % 9;
+    if(cellIndex < 0 || cellIndex >= 81) return;
+    int r = cellIndex / 9;
+    int c = cellIndex % 9;
 
     if(value < 0 || value > 9) return;
 
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
-        emit boardChanged();
+
+        // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
+        QModelIndex modelIdx = index(cellIndex, 0);
+        emit dataChanged(modelIdx, modelIdx);
 
         // 값이 바뀔 때마다 에러 상태 갱신
         checkErrors();
@@ -102,10 +126,12 @@ void SudokuBackend::clear()
 {
     if(m_isBusy) return; // 작업 중엔 수정 불가
 
+    // 전체 보드가 지워질 때는 데이터 갱신이 아닌 모델 리셋을 수행하여 뷰를 동기화
+    beginResetModel();
     for(int i{0}; i < 9; ++i) {
         m_board[i].fill(0);
     }
-    emit boardChanged();
+    endResetModel();
 
     // 클리어 시 에러 초기화
     checkErrors();
@@ -159,7 +185,7 @@ void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
     m_workerThread->start();
 }
 
-void SudokuBackend::solveBacktracking()
+void SudokuBackend::solve()
 {
     if(m_isBusy) return;
     if(!isValidBoard()) {
@@ -202,8 +228,7 @@ void SudokuBackend::togglePause()
 void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
 {
     m_board = board;
-    emit boardChanged();
-    // checkErrors(); // 시각화 중 실시간 에러 검사
+    emit dataChanged(index(0, 0), index(80, 0));
 }
 
 void SudokuBackend::handleWorkerFinished(bool success)
