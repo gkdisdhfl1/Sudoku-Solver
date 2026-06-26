@@ -46,6 +46,8 @@ QVariant SudokuBackend::data(const QModelIndex &index, int role) const
 
     if (role == Qt::DisplayRole || role == ValueRole) {
         return m_board[r][c];
+    } else if (role == ErrorRole) {
+        return m_errorCells.test(idx);
     }
 
     return QVariant();
@@ -55,12 +57,14 @@ QHash<int, QByteArray> SudokuBackend::roleNames() const
 {
     QHash<int, QByteArray> roles;
     roles[ValueRole] = "value";
+    roles[ErrorRole] = "isError";
     return roles;
 }
 
-QList<int> SudokuBackend::errorCells() const
+bool SudokuBackend::hasErrors() const
 {
-    return m_errorCells;
+    // 에러가 1개라도 존재하는지 여부 반환
+    return m_errorCells.any();
 }
 
 bool SudokuBackend::visualize() const
@@ -249,20 +253,36 @@ void SudokuBackend::handleWorkerFinished(bool success)
 //  --- private ---
 void SudokuBackend::checkErrors()
 {
-    QList<int> newErrors;
+    std::bitset<81> newErrors;
     for(int r = 0; r < 9; ++r) {
         for(int c = 0; c < 9; ++c) {
             int num = m_board[r][c];
             if(num != 0) {
                 if(!SudokuSolver::isValid(m_board, r, c, num, true)) {
-                    newErrors.append(r * 9 + c);
+                    newErrors.set(r * 9 + c);
                 }
             }
         }
     }
 
     if(m_errorCells != newErrors) {
+        // 1. XOR 연산 한 번으로 변경된 인덱스 비트 필드  획득 (힙 메모리 할당 0)
+        std::bitset<81> changed = m_errorCells ^ newErrors;
+        bool wasErrors = m_errorCells.any();
+
         m_errorCells = newErrors;
-        emit errorCellsChanged();
+
+        // 2. 전체 에러 보유 상태가 변경되었을 때만 프로퍼티 신호 방출
+        if(wasErrors != m_errorCells.any()) {
+            emit hasErrorsChanged();
+        }
+
+        // 3. 상태가 바뀐(1이 켜진) 인덱스에 대해서만 ErrorRole 업데이트 통보
+        for(size_t idx = 0; idx < 81; ++idx) {
+            if(changed.test(idx)) {
+                QModelIndex modelIdx = index(idx, 0);
+                emit dataChanged(modelIdx, modelIdx, {ErrorRole});
+            }
+        }
     }
 }

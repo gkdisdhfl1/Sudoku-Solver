@@ -5,11 +5,12 @@
 #include <QAbstractListModel>
 #include <QtQml/qqmlregistration.h>
 #include <QPointer>
+#include <bitset>
 
 class SudokuBackend : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(QList<int> errorCells READ errorCells NOTIFY errorCellsChanged)
+    Q_PROPERTY(bool hasErrors READ hasErrors NOTIFY hasErrorsChanged);
 
     // 시각화 관련 프로퍼티
     Q_PROPERTY(bool visualize READ visualize WRITE setVisualize NOTIFY visualizeChanged)
@@ -24,13 +25,14 @@ public:
 
     // QAbstractListModel 인터페이스 오버라이드
     enum BoardRoles {
-        ValueRole = Qt::UserRole + 1
+        ValueRole = Qt::UserRole + 1,
+        ErrorRole
     };
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    QList<int> errorCells() const;
+    bool hasErrors() const;
 
     // 시각화 Getter/Setter
     bool visualize() const;
@@ -54,7 +56,7 @@ public:
     Q_INVOKABLE void togglePause();
 
 signals:
-    void errorCellsChanged();
+    void hasErrorsChanged();
     void visualizeChanged();
     void delayChanged();
     void isBusyChanged();
@@ -68,7 +70,7 @@ private slots:
 
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
-    QList<int> m_errorCells;
+    std::bitset<81> m_errorCells;
 
     // 시각화 설정 변수
     bool m_visualize{false};
