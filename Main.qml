@@ -65,6 +65,7 @@ Window {
 
                     required property int index
                     required property int value // display 롤에 바인딩된 변수
+                    required property bool isError
                     readonly property int row: Math.floor(index / 9)
                     readonly property int col: index % 9
                     readonly property int blockRow: Math.floor(row / 3)
@@ -72,9 +73,6 @@ Window {
 
                     // 3x3 구역 구분을 위한 배경색 교차 (체커보드 스타일)
                     readonly property bool isDarkBlock: (blockRow + blockCol) % 2 !== 0
-
-                    // 백엔드의 errorCells 리스트에 현재 인덱스가 포함되어 있는지  확인
-                    readonly property bool isError: backend.errorCells.includes(index)
 
                     implicitWidth: 48
                     implicitHeight: 48
@@ -162,7 +160,7 @@ Window {
             Button {
                 text: !backend.isBusy ? "Solve" : (backend.isPaused ? "Resume" : "Pause")
                 highlighted: !backend.isBusy
-                enabled: backend.isBusy || backend.errorCells.length === 0
+                enabled: backend.isBusy || !backend.hasErrors
 
                 onClicked: {
                     if (backend.isBusy) {
