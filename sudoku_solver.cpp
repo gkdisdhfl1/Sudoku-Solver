@@ -44,15 +44,18 @@ SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm alg
 
 void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
 {
-    // 초기화
+    // 1. 보드 초기화
     for(int i{0}; i < 9; ++i)
         board[i].fill(0);
 
-    // 무작위 채우기
+    // 2. 스도쿠 판 무작위 채우기
     solveRandomly(board);
 
-    // 3. 구멍 뚫기
-    int removeCount = 35 + (difficulty * 10);
+    // 3. 난이도별 타겟 지우기 개수 정의 (Easy: 32, Midium: 42, Hard: 52)
+    int targetRemoveCount{std::clamp(0, 32 + difficulty * 10, 64)};
+    int currentRemoved{0};
+
+    // 0 ~ 80 인덱스 셔플
     QVector<int> indices(81);
     std::iota(indices.begin(), indices.end(), 0);
 
@@ -60,10 +63,33 @@ void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
     thread_local std::mt19937 g(rd());
     std::shuffle(indices.begin(), indices.end(), g);
 
-    for(int i{0}; i < removeCount; ++i) {
+    // 4. 셀을 하나씩 지우며 유일해 검증
+    for(int i{0}; i < 81; ++i) {
+        if(currentRemoved >= targetRemoveCount)
+            break;
+
         int idx = indices[i];
-        board[idx / 9][idx % 9] = 0;
+        int r{idx / 9};
+        int c{idx % 9};
+
+        // 이미 지워진 셀이 아니면 시도
+        if (board[r][c] != 0) {
+            int backup{board[r][c]};
+            board[r][c] = 0;
+
+            // 유일해 검사 수행
+            if (hasUniqueSolution(board)) {
+                ++currentRemoved; // 유일해가 유지되므로 지운 상태 확정
+            } else {
+                board[r][c] = backup; // 유일해가 깨지면 원래대로 복원
+            }
+        }
     }
+}
+
+bool SudokuSolver::hasUniqueSolution(QVector<QVector<int>>& board)
+{
+    return countSolutions(board, 2) == 1;
 }
 
 // --- private ---
@@ -116,8 +142,8 @@ bool SudokuSolver::solveRandomly(QVector<QVector<int>> &board)
         for(int c{0}; c < 9; ++c) {
             if(board[r][c] == 0) {
                 std::array<int, 9> nums = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-                static std::random_device rd;
-                static std::mt19937 g(rd());
+                thread_local std::random_device rd;
+                thread_local std::mt19937 g(rd());
                 std::shuffle(nums.begin(), nums.end(), g);
 
                 for(int num : nums) {
@@ -132,4 +158,29 @@ bool SudokuSolver::solveRandomly(QVector<QVector<int>> &board)
         }
     }
     return true;
+}
+
+int SudokuSolver::countSolutions(QVector<QVector<int>>& board, int maxCount)
+{
+    if (maxCount <= 0)
+        return 0;
+
+    for(int r{0}; r < 9; ++r) {
+        for(int c{0}; c < 9; ++c) {
+            if(board[r][c] == 0) {
+                int count{0};
+                for(int num{1}; num <= 9; ++num) {
+                    if(isValid(board, r, c, num)) {
+                        board[r][c] = num;
+                        count += countSolutions(board, maxCount - count);
+                        board[r][c] = 0; // backtrack
+
+                        if(count >= maxCount) return count;
+                    }
+                }
+                return count;
+            }
+        }
+    }
+    return 1;
 }

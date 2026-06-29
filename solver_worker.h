@@ -38,9 +38,6 @@ private:
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
 
-    // 시각화가 포함된 백트래킹
-    bool solveWithVisualization(QVector<QVector<int>> &board);
-
     // 일시 정지 관련
     QMutex m_pauseMutex;
     QWaitCondition m_pauseCondition;
