@@ -35,10 +35,16 @@ public:
     // 퍼즐 생성
     void generate(QVector<QVector<int>> &board, int difficulty);
 
+    // 유일해 검증 함수
+    bool hasUniqueSolution(const QVector<QVector<int>>& board);
+
 private:
     SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback  );
 
     bool solveRandomly(QVector<QVector<int>> &board);
+
+    // 해의 개수를 세기 위한 재귀 백트래킹 함수 (최대 2개까지만 카운트)
+    int countSolutions(QVector<QVector<int>>& board, int maxCount);
 };
 
 #endif // SUDOKU_SOLVER_H
