@@ -36,7 +36,7 @@ public:
     void generate(QVector<QVector<int>> &board, int difficulty);
 
     // 유일해 검증 함수
-    bool hasUniqueSolution(const QVector<QVector<int>>& board);
+    bool hasUniqueSolution(QVector<QVector<int>>& board);
 
 private:
     SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback  );

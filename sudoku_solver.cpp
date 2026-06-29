@@ -52,7 +52,7 @@ void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
     solveRandomly(board);
 
     // 3. 난이도별 타겟 지우기 개수 정의 (Easy: 32, Midium: 42, Hard: 52)
-    int targetRemoveCount{32 + (difficulty * 10)};
+    int targetRemoveCount{std::clamp(0, 32 + difficulty * 10, 64)};
     int currentRemoved{0};
 
     // 0 ~ 80 인덱스 셔플
@@ -87,10 +87,9 @@ void SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty)
     }
 }
 
-bool SudokuSolver::hasUniqueSolution(const QVector<QVector<int>>& board)
+bool SudokuSolver::hasUniqueSolution(QVector<QVector<int>>& board)
 {
-    QVector<QVector<int>> tempBoard = board;
-    return countSolutions(tempBoard, 2) == 1;
+    return countSolutions(board, 2) == 1;
 }
 
 // --- private ---
@@ -143,8 +142,8 @@ bool SudokuSolver::solveRandomly(QVector<QVector<int>> &board)
         for(int c{0}; c < 9; ++c) {
             if(board[r][c] == 0) {
                 std::array<int, 9> nums = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-                static std::random_device rd;
-                static std::mt19937 g(rd());
+                thread_local std::random_device rd;
+                thread_local std::mt19937 g(rd());
                 std::shuffle(nums.begin(), nums.end(), g);
 
                 for(int num : nums) {
@@ -163,6 +162,9 @@ bool SudokuSolver::solveRandomly(QVector<QVector<int>> &board)
 
 int SudokuSolver::countSolutions(QVector<QVector<int>>& board, int maxCount)
 {
+    if (maxCount <= 0)
+        return 0;
+
     for(int r{0}; r < 9; ++r) {
         for(int c{0}; c < 9; ++c) {
             if(board[r][c] == 0) {
