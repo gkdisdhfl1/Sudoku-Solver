@@ -16,16 +16,20 @@ Window {
         id: backend
 
         // 비동기로 전달되는 결과를 여기서 처리
-        onSolveFinished: success => {
-            if (!success) {
-                console.log("Solution not found");
-                // 나중에 알림 팝업 띄우는 로직 추가
-            } else {
-                console.log("Puzzle solved!");
-            }
+        onSolveFinished: (status, elapsedMs) => {
+                             if (status === 0) {
+                                 resultDialog.showReport(true, elapsedMs, "Backtracking");
+                             } else if (status === 1) {
+                                 resultDialog.showReport(false, 0, "Backtracking");
+                             } else if (status === 2) {
+                                 console.log("Solving was stopped by user.");
+                             }
         }
     }
 
+    // ===================================================
+    // 전체  화면을 그리는 메인 레이아웃
+    // ===================================================
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
@@ -315,6 +319,143 @@ Window {
         // 하단 여백
         Item {
             Layout.fillHeight: true
+        }
+    }
+
+    // ===================================================
+    // 풀이 통계 및 알고리즘 정보 출력을 위한 상세 리포트 다이얼로그
+    // ===================================================
+    Dialog {
+        id: resultDialog
+        anchors.centerIn: parent
+        width: 320
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            color: "#ffffff"
+            radius: 16
+            border.color: "#e2e8f0"
+            border.width: 1
+            layer.enabled: true
+        }
+
+        // 다이얼로그 내부 레이아웃
+        ColumnLayout {
+            width: parent.width
+            spacing: 20
+            anchors.margins: 10
+
+            // 1. 헤더 (성공/실패 비주얼)
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 10
+                Text {
+                    id: reportIcon
+                    font.pixelSize: 24
+                }
+                Text {
+                    id: reportTitle
+                    font.pixelSize: 20
+                    font.bold: true
+                }
+            }
+
+            // 구분선
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: "#f1f5f9"
+            }
+
+            // 2. 핵심 분석 메타데이터 테이블 (알고리즘, 소요시간 등)
+            GridLayout {
+                columns: 2
+                columnSpacing: 25
+                rowSpacing: 12
+                Layout.alignment: Qt.AlignHCenter
+
+                // 알고리즘 종류
+                Text {
+                    text: "Algorithm";
+                    font.bold: true;
+                    color: "#64748b"
+                }
+                Text {
+                    id: valAlgorithm
+                    text: "Backtracking" // 기본값 (추후 동적 바인딩)
+                    font.bold: true
+                    color: "#1e293b"
+                }
+
+                // 소요 시간
+                Text {
+                    text: "Time Elapsed";
+                    font.bold: true;
+                    color: "#64748b"
+                }
+                Text {
+                    id: valTime
+                    text: "0 ms" // 기본값
+                    font.bold: true
+                    color: "#1e293b"
+                }
+
+                // 상태 메시지
+                Text {
+                    text: "Status";
+                    font.bold: true;
+                    color: "#64748b"
+                }
+                Text {
+                    id: valStatus
+                    font.bold: true
+                }
+            }
+
+            // 구분선
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: "#f1f5f9"
+            }
+
+            // 3. 닫기 버튼
+            Button {
+                text: "Confirm"
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: 120
+
+                background: Rectangle {
+                    color: "#34495e"
+                    radius: 8
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.bold: true
+                }
+
+                onClicked: resultDialog.close()
+            }
+        }
+
+        // 다이얼로그 연동 호출 함수 (추후 알고리즘 및 소요시간 변수 전달 가능)
+        function showReport(isSuccess, elapsedMs = 0, algorithmName = "Backtracking") {
+            reportIcon.text = isSuccess ? "🏆" : "⚠";
+            reportTitle.text = isSuccess ? "Solved!" : "Unsolved";
+            reportTitle.color = isSuccess ? "#2ecc71" : "#e74c3c"
+
+            valAlgorithm.text = algorithmName;
+            valTime.text = elapsedMs + " ms";
+
+            valStatus.text = isSuccess ? "Success" : "No Solution";
+            valStatus.color = isSuccess ? "#2ecc71" : "#e74c3c";
+
+            resultDialog.open();
         }
     }
 }

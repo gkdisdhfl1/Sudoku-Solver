@@ -13,6 +13,9 @@ SudokuBackend::SudokuBackend(QObject *parent)
         m_board[i].resize(9);
         m_board[i].fill(0);
     }
+
+    // 스레드 간 std::expected 원격 통신을 위한 Qt 메타타입 등록
+    qRegisterMetaType<std::expected<int, SolveResult>>("std::expected<int, SolveResult>");
 }
 
 SudokuBackend::~SudokuBackend()
@@ -193,7 +196,7 @@ void SudokuBackend::solve()
 {
     if(m_isBusy) return;
     if(!isValidBoard()) {
-        emit solveFinished(false);
+        emit solveFinished(1, 0); // 실패 상태코드 1, 시간 0ms 통보
         return;
     }
 
@@ -235,7 +238,7 @@ void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
     emit dataChanged(index(0, 0), index(80, 0));
 }
 
-void SudokuBackend::handleWorkerFinished(bool success)
+void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result)
 {
     m_isBusy = false;
     m_isPaused = false;
@@ -247,7 +250,15 @@ void SudokuBackend::handleWorkerFinished(bool success)
 
     checkErrors(); // 최종 상태 에러 검사
 
-    emit solveFinished(success);
+    if (jobType == SolverWorker::JobType::Solve) {
+        if (result.has_value()) {
+            emit solveFinished(0, result.value()); // 성공(0) 및 측정 시간 전달
+        } else {
+            emit solveFinished(static_cast<int>(result.error()), 0); // 실패 코드(1 or 2) 및 0ms 전달
+        }
+    } else if (jobType == SolverWorker::JobType::Generate) {
+        emit generateFinished(result.has_value());
+    }
 }
 
 //  --- private ---

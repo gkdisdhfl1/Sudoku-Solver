@@ -5,6 +5,8 @@
 #include <QElapsedTimer>
 #include <QMutex>
 #include <QWaitCondition>
+#include <expected>
+#include "sudoku_solver.h"
 
 class SolverWorker : public QObject
 {
@@ -20,6 +22,10 @@ public:
                           int difficulty = 0,
                           QObject *parent = nullptr);
 
+    JobType jobType() const {
+        return m_jobType;
+    }
+
 public slots:
     void process(); // 스레드 시작 시 호출될 메인 함수
     void requestStop(); // 외부에서 중단 요청
@@ -27,7 +33,8 @@ public slots:
 
 signals:
     void boardUpdated(const QVector<QVector<int>> &board);
-    void finished(bool success);
+    // 성공 시 풀이 시간(int), 실패 시 예외 결과(SolveResult) 전송
+    void finished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
 
 private:
     QVector<QVector<int>> m_board;

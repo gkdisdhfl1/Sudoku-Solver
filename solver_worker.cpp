@@ -41,27 +41,36 @@ void SolverWorker::process()
     };
 
     if(m_jobType == JobType::Solve) {
+        //  순수 알고리즘 풀이 시간만 측정하기 위해 타이머 구동
+        QElapsedTimer solveTimer;
+        solveTimer.start();
+
         if(m_visualize) {
             m_updateTimer.start(); // 타이머 시작
 
             // 시각화 전용 콜백 주입
             result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
+            emit boardUpdated(m_board);
         } else {
             // 비시각화 중단용 콜백 주입
             result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
         }
 
-        // 성공 여부 판단 및 최종 보드 업데이트 (시각화/비시각화 공통)
-        bool success = (result == SolveResult::Success);
-        if (success || m_visualize) {
-            emit boardUpdated(m_board);
-        }
-        emit finished(success);
+        qint64 elapsedMs = solveTimer.elapsed();
 
+        if (result == SolveResult::Success) {
+            emit boardUpdated(m_board);
+            // 성공 : elapsedMs 데이터 주입
+            emit finished(m_jobType, static_cast<int>(elapsedMs));
+        } else {
+            // 실패/중단: std::unexpected 에러 상태 주입
+            emit finished(m_jobType, std::unexpected<SolveResult>(result));
+        }
     } else if(m_jobType == JobType::Generate) {
         solver.generate(m_board, m_difficulty);
         emit boardUpdated(m_board);
-        emit finished(true);
+        // 생성 성공 시 더미 값 (0ms) 반환
+        emit finished(m_jobType, 0);
     }
 }
 
