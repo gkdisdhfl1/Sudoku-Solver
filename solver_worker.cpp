@@ -93,7 +93,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
         }
     }
 
-    // 2. UI 갱싱 (Throttling)
+    // 2. UI 갱신 (Throttling)
     if(m_delay > 10 || m_updateTimer.elapsed() >= 16) {
         emit boardUpdated(currentBoard);
         m_updateTimer.restart();
