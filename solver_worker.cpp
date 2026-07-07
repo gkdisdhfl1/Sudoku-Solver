@@ -41,27 +41,48 @@ void SolverWorker::process()
     };
 
     if(m_jobType == JobType::Solve) {
-        //  순수 알고리즘 풀이 시간만 측정하기 위해 타이머 구동
-        QElapsedTimer solveTimer;
-        solveTimer.start();
+        m_pureAlgorithmTime = std::chrono::nanoseconds(0);
 
         if(m_visualize) {
             m_updateTimer.start(); // 타이머 시작
 
-            // 시각화 전용 콜백 주입
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
+            // 콜백을 래퍼로 감싸서 타이머를 자동 정지/재개
+            auto timeCallback = [this](const QVector<QVector<int>>& board) -> bool {
+                // 알고리즘이 콜백을 호출한 순간 = 알고리즘 구간 끝
+                auto callbackEnter = std::chrono::steady_clock::now();
+                m_pureAlgorithmTime += (callbackEnter - m_lastResumeTime);
+
+                bool continueRunning = processStep(board);
+
+                // 콜백 반환 직전 = 알고리즘 구간 시작
+                m_lastResumeTime = std::chrono::steady_clock::now();
+                return continueRunning;
+            };
+            
+            // 최초 알고리즘 시작 시점 기록
+            m_lastResumeTime = std::chrono::steady_clock::now();
+            result = solver.solve(m_board, SolveAlgorithm::BackTracking, timeCallback);
+
+            // 마지막 알고리즘 구간 (최종 콜백 이후 ~ solve 반환)
+            m_pureAlgorithmTime += (std::chrono::steady_clock::now() - m_lastResumeTime);
+
             emit boardUpdated(m_board);
         } else {
-            // 비시각화 중단용 콜백 주입
+            // 비시각화: 콜백 오버헤드가 거의 없으므로 단순 측정
+            auto start = std::chrono::steady_clock::now();
             result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
+
+            m_pureAlgorithmTime = std::chrono::steady_clock::now() - start;
         }
 
-        qint64 elapsedMs = solveTimer.elapsed();
+        int pureElapsedMs = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(m_pureAlgorithmTime).count()
+        );
 
         if (result == SolveResult::Success) {
             emit boardUpdated(m_board);
             // 성공 : elapsedMs 데이터 주입
-            emit finished(m_jobType, static_cast<int>(elapsedMs));
+            emit finished(m_jobType, static_cast<int>(pureElapsedMs));
         } else {
             // 실패/중단: std::unexpected 에러 상태 주입
             emit finished(m_jobType, std::unexpected<SolveResult>(result));

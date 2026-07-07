@@ -422,24 +422,27 @@ Window {
             }
 
             // 3. 닫기 버튼
-            Button {
-                text: "Confirm"
+            Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 120
+                height: 36
+                color: mouseArea.pressed ? "#2c3e50" : "#34495e"
+                radius: 8
 
-                background: Rectangle {
-                    color: "#34495e"
-                    radius: 8
-                }
-                contentItem: Text {
-                    text: parent.text
+                Text {
+                    anchors.centerIn: parent
+                    text: "Confirm"
                     color: "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
                     font.bold: true
+                    font.pixelSize: 14
                 }
 
-                onClicked: resultDialog.close()
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: resultDialog.close()
+                }
             }
         }
 

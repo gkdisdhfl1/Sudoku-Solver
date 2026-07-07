@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <expected>
+#include <chrono>
 #include "sudoku_solver.h"
 
 class SolverWorker : public QObject
@@ -44,6 +45,10 @@ private:
     int m_difficulty;
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
+
+    // 순수 알고리즘 실행에 소요된 총 누적 시간
+    std::chrono::nanoseconds m_pureAlgorithmTime{0};
+    std::chrono::steady_clock::time_point m_lastResumeTime;
 
     // 일시 정지 관련
     QMutex m_pauseMutex;
