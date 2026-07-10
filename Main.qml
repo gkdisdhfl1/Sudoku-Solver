@@ -66,11 +66,16 @@ Window {
             function focusCellAt(targetIndex) {
                 for (let i = 0; i < sudokuGrid.children.length; ++i) {
                     let child = sudokuGrid.children[i];
+
                     // 자식 중 index 속성이 일치하는 셀 대리자를 찾아 포커싱
                     // 1. child 객체가 존재하고,
-                    // 2. index 프로퍼티를 가지고 있으며 우리가 찾는 타겟 인덱스이고,
-                    // 3. focusInput 속성이 존재하며 그 타입이 실제 실행 가능한 "function"인 경우에만  호출
-                    if (child && child.index === targetIndex && typeof child.focusInput === "function") {
+                    // 2. child.index가 정의되어 있고,
+                    // 3. index 프로퍼티를 가지고 있으며 우리가 찾는 타겟 인덱스이고,
+                    // 4. focusInput 속성이 존재하며 그 타입이 실제 실행 가능한 "function"인 경우에만  호출
+                    if (child 
+                        && child.index !== undefined
+                        && child.index === targetIndex 
+                        && typeof child.focusInput === "function") {
                         child.focusInput();
                         break;
                     }
@@ -327,7 +332,11 @@ Window {
     // ===================================================
     Dialog {
         id: resultDialog
-        anchors.centerIn: parent
+        
+        // x, y 수식을 이용한 화면 중앙 정렬
+        x: Math.round((parent.width - width) / 2)
+        y: Math.round((parent.height - height) / 2)
+        
         width: 320
         modal: true
         focus: true

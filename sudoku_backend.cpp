@@ -14,8 +14,12 @@ SudokuBackend::SudokuBackend(QObject *parent)
         m_board[i].fill(0);
     }
 
-    // 스레드 간 std::expected 원격 통신을 위한 Qt 메타타입 등록
+    // ====================================================
+    // 스레드 간 안전한 시그널 전송을 위한 Qt 메타타입 등록
+    // ====================================================
     qRegisterMetaType<std::expected<int, SolveResult>>("std::expected<int, SolveResult>");
+    qRegisterMetaType<SolverWorker::JobType>("SolverWorker::JobType");
+
 }
 
 SudokuBackend::~SudokuBackend()
