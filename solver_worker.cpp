@@ -41,27 +41,57 @@ void SolverWorker::process()
     };
 
     if(m_jobType == JobType::Solve) {
+        m_pureAlgorithmTime = std::chrono::nanoseconds(0);
+
         if(m_visualize) {
             m_updateTimer.start(); // 타이머 시작
 
-            // 시각화 전용 콜백 주입
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
-        } else {
-            // 비시각화 중단용 콜백 주입
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
-        }
+            // 콜백을 래퍼로 감싸서 타이머를 자동 정지/재개
+            auto timeCallback = [this](const QVector<QVector<int>>& board) -> bool {
+                // 알고리즘이 콜백을 호출한 순간 = 알고리즘 구간 끝
+                auto callbackEnter = std::chrono::steady_clock::now();
+                m_pureAlgorithmTime += (callbackEnter - m_lastResumeTime);
 
-        // 성공 여부 판단 및 최종 보드 업데이트 (시각화/비시각화 공통)
-        bool success = (result == SolveResult::Success);
-        if (success || m_visualize) {
+                bool continueRunning = processStep(board);
+
+                // 콜백 반환 직전 = 알고리즘 구간 시작
+                m_lastResumeTime = std::chrono::steady_clock::now();
+                return continueRunning;
+            };
+            
+            // 최초 알고리즘 시작 시점 기록
+            m_lastResumeTime = std::chrono::steady_clock::now();
+            result = solver.solve(m_board, SolveAlgorithm::BackTracking, timeCallback);
+
+            // 마지막 알고리즘 구간 (최종 콜백 이후 ~ solve 반환)
+            m_pureAlgorithmTime += (std::chrono::steady_clock::now() - m_lastResumeTime);
+
             emit boardUpdated(m_board);
-        }
-        emit finished(success);
+        } else {
+            // 비시각화: 콜백 오버헤드가 거의 없으므로 단순 측정
+            auto start = std::chrono::steady_clock::now();
+            result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
 
+            m_pureAlgorithmTime = std::chrono::steady_clock::now() - start;
+        }
+
+        int pureElapsedMs = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(m_pureAlgorithmTime).count()
+        );
+
+        if (result == SolveResult::Success) {
+            emit boardUpdated(m_board);
+            // 성공 : elapsedMs 데이터 주입
+            emit finished(m_jobType, static_cast<int>(pureElapsedMs));
+        } else {
+            // 실패/중단: std::unexpected 에러 상태 주입
+            emit finished(m_jobType, std::unexpected<SolveResult>(result));
+        }
     } else if(m_jobType == JobType::Generate) {
         solver.generate(m_board, m_difficulty);
         emit boardUpdated(m_board);
-        emit finished(true);
+        // 생성 성공 시 더미 값 (0ms) 반환
+        emit finished(m_jobType, 0);
     }
 }
 
@@ -93,7 +123,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
         }
     }
 
-    // 2. UI 갱싱 (Throttling)
+    // 2. UI 갱신 (Throttling)
     if(m_delay > 10 || m_updateTimer.elapsed() >= 16) {
         emit boardUpdated(currentBoard);
         m_updateTimer.restart();

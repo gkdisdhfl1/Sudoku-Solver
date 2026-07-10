@@ -6,6 +6,8 @@
 #include <QtQml/qqmlregistration.h>
 #include <QPointer>
 #include <bitset>
+#include <expected>
+#include "sudoku_solver.h"
 
 class SudokuBackend : public QAbstractListModel
 {
@@ -61,12 +63,13 @@ signals:
     void delayChanged();
     void isBusyChanged();
     void isPausedChanged();
-    void solveFinished(bool success);
+    void solveFinished(int status, int elapsedMs);
+    void generateFinished(bool success);
 
 private slots:
     // 워커 시그널 처리용
     void handleBoardUpdate(const QVector<QVector<int>> &board);
-    void handleWorkerFinished(bool success);
+    void handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
 
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
