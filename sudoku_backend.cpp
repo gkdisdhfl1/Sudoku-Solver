@@ -169,6 +169,11 @@ bool SudokuBackend::isValidBoard() const
 // --- 메인 기능 ---
 void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
 {
+    if (m_workerThread && m_workerThread->isRunning()) {
+        m_workerThread->quit();
+        m_workerThread->wait();
+    }
+
     m_isBusy = true;
     emit isBusyChanged();
 
@@ -261,7 +266,11 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
             emit solveFinished(static_cast<int>(result.error()), 0); // 실패 코드(1 or 2) 및 0ms 전달
         }
     } else if (jobType == SolverWorker::JobType::Generate) {
-        emit generateFinished(result.has_value());
+        if (result.has_value()) {
+            emit generateFinished(true); 
+        } else {
+            emit generateFinished(false);
+        }
     }
 }
 

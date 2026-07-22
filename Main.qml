@@ -62,27 +62,14 @@ Window {
             // 작업 중일 때 그리드 조작 방지
             enabled: !backend.isBusy
 
-            // 특정 인덱스의 셀을 찾아 키보드 포커스를 강제하는 함수
+            // 특정 인덱스의 셀을 지정해 키보드 포커스를 강제하는 함수
             function focusCellAt(targetIndex) {
-                for (let i = 0; i < sudokuGrid.children.length; ++i) {
-                    let child = sudokuGrid.children[i];
-
-                    // 자식 중 index 속성이 일치하는 셀 대리자를 찾아 포커싱
-                    // 1. child 객체가 존재하고,
-                    // 2. child.index가 정의되어 있고,
-                    // 3. index 프로퍼티를 가지고 있으며 우리가 찾는 타겟 인덱스이고,
-                    // 4. focusInput 속성이 존재하며 그 타입이 실제 실행 가능한 "function"인 경우에만  호출
-                    if (child 
-                        && child.index !== undefined
-                        && child.index === targetIndex 
-                        && typeof child.focusInput === "function") {
-                        child.focusInput();
-                        break;
-                    }
-                }
+                // targetIndex에 대응하는 셀을 즉시 획득하여 존재할 시 포커스 전파
+                cellRepeater.itemAt(targetIndex)?.focusInput?.();
             }
 
             Repeater {
+                id: cellRepeater
                 model: backend
                 delegate: Rectangle {
                     id: cell
