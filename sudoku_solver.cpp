@@ -57,7 +57,7 @@ bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCa
         return false;
     }
 
-    // 3. 난이도별 타겟 지우기 개수 정의 (Easy: 32, Midium: 42, Hard: 52)
+    // 3. 난이도별 타겟 지우기 개수 정의 (Easy: 32, Medium: 42, Hard: 52)
     int targetRemoveCount{std::clamp(32 + difficulty * 10, 0, 64)};
     int currentRemoved{0};
 
@@ -221,3 +221,4 @@ int SudokuSolver::countSolutions(QVector<QVector<int>> &board, int maxCount, int
         return countSolutions(board, maxCount, idx + 1);
     }
 }
+

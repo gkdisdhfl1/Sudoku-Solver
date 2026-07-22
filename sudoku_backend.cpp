@@ -169,6 +169,9 @@ bool SudokuBackend::isValidBoard() const
 // --- 메인 기능 ---
 void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
 {
+    if (m_worker) {
+        m_worker->requestStop();
+    }
     if (m_workerThread && m_workerThread->isRunning()) {
         m_workerThread->quit();
         m_workerThread->wait();

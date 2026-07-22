@@ -46,9 +46,8 @@ private:
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
 
-    // 순수 알고리즘 실행에 소요된 총 누적 시간
-    std::chrono::nanoseconds m_pureAlgorithmTime{0};
-    std::chrono::steady_clock::time_point m_lastResumeTime;
+    // 알고리즘 외 UI 대기 및 지연에 소요된 총 오버헤드 시간
+    std::chrono::nanoseconds m_accumulatedOverheadTime{0};
 
     // 일시 정지 관련
     QMutex m_pauseMutex;

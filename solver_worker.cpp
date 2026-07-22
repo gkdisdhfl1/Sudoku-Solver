@@ -41,7 +41,7 @@ void SolverWorker::process()
     };
 
     if(m_jobType == JobType::Solve) {
-        m_pureAlgorithmTime = std::chrono::nanoseconds(0);
+        m_accumulatedOverheadTime = std::chrono::nanoseconds(0);
 
         // 1. 전체 풀이에  걸린 총 벽시계 시간 측정 시작
         auto totalStart = std::chrono::steady_clock::now();
@@ -59,7 +59,7 @@ void SolverWorker::process()
 
         // 2. 순수 알고리즘 시간 = 전체 벽시계 시간 - 누적 대기 시간
         auto totalWallClock = std::chrono::duration_cast<std::chrono::nanoseconds>(totalEnd - totalStart);
-        auto pureElapsed = totalWallClock - m_pureAlgorithmTime; // m_pureAlgorithmTime에는 대기 시간이 누적되어 있음
+        auto pureElapsed = totalWallClock - m_accumulatedOverheadTime; // m_accumulatedOverheadTime에는 대기 시간이 누적되어 있음
         if (pureElapsed.count() < 0) {
             pureElapsed = std::chrono::nanoseconds(0);
         }
@@ -119,7 +119,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
                 if(m_stopRequested) return false;
                 m_pauseCondition.wait(&m_pauseMutex);
             }
-            m_pureAlgorithmTime += (std::chrono::steady_clock::now() - waitStart); // 대기 시간 합산
+            m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - waitStart); // 대기 시간 합산
         }
     }
 
@@ -128,7 +128,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
         auto emitStart = std::chrono::steady_clock::now();
         emit boardUpdated(currentBoard);
         m_updateTimer.restart();
-        m_pureAlgorithmTime += (std::chrono::steady_clock::now() - emitStart); // 시그널 오버헤드 합산
+        m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - emitStart); // 시그널 오버헤드 합산
     }
 
     // 3. 지연 (Smart Sleep)
@@ -139,7 +139,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
         if(!m_stopRequested) { // 이미 stop 요청이 왔다면 잘 필요 없음
             m_pauseCondition.wait(&m_pauseMutex, m_delay);
         }
-        m_pureAlgorithmTime += (std::chrono::steady_clock::now() - sleepStart); // 슬립 시간 합산
+        m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - sleepStart); // 슬립 시간 합산
     }
 
     return true; // 계속 진행
