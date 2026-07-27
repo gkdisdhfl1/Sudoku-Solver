@@ -3,9 +3,11 @@
 
 #include <QVector>
 #include <functional>
+#include <random>
 
 enum class SolveAlgorithm {
     BackTracking,
+    Randomly,
     // 추후 추가
 };
 
@@ -45,6 +47,8 @@ private:
 
     // 해의 개수를 세기 위한 재귀 백트래킹 함수 (최대 2개까지만 카운트)
     int countSolutions(QVector<QVector<int>>& board, int maxCount, int idx = 0);
+
+    std::mt19937& get_thread_local_generator();
 };
 
 #endif // SUDOKU_SOLVER_H

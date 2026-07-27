@@ -12,6 +12,7 @@ qt_policy(SET QTP0001 NEW)
 
 qt_add_executable(appSudokuSolver
     main.cpp
+    sudoku_constants.h
 )
 
 qt_add_qml_module(appSudokuSolver

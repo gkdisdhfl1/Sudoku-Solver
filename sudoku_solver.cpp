@@ -1,5 +1,7 @@
 #include "sudoku_solver.h"
-#include <random>
+#include "sudoku_constants.h"
+
+using namespace SudokuConstants;
 
 SudokuSolver::SudokuSolver() {}
 
@@ -40,9 +42,8 @@ SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm alg
     switch (algorithm) {
     case SolveAlgorithm::BackTracking:
         return solveBacktracking(board, callback, 0);
-    default:
-        return solveBacktracking(board, callback, 0);
     }
+    Q_UNREACHABLE();
 }
 
 bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCallback callback)
@@ -58,16 +59,14 @@ bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCa
     }
 
     // 3. 난이도별 타겟 지우기 개수 정의 (Easy: 32, Medium: 42, Hard: 52)
-    int targetRemoveCount{std::clamp(32 + difficulty * 10, 0, 64)};
+    int targetRemoveCount{std::clamp(BASE_REMOVE_COUNT + difficulty * DIFFICULTY_STEP, MIN_REMOVE_COUNT, MAX_REMOVE_COUNT)};
     int currentRemoved{0};
 
     // 0 ~ 80 인덱스 셔플
     QVector<int> indices(81);
     std::iota(indices.begin(), indices.end(), 0);
 
-    thread_local std::random_device rd;
-    thread_local std::mt19937 g(rd());
-    std::shuffle(indices.begin(), indices.end(), g);
+    std::shuffle(indices.begin(), indices.end(), get_thread_local_generator());
 
     // 4. 셀을 하나씩 지우며 유일해 검증
     for (int idx : indices) {
@@ -101,7 +100,7 @@ bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCa
 
 bool SudokuSolver::hasUniqueSolution(QVector<QVector<int>> &board)
 {
-    return countSolutions(board, 2, 0) == 1;
+    return countSolutions(board, UNIQUE_SOLUTION_LIMIT, 0) == 1;
 }
 
 // --- private ---
@@ -162,9 +161,7 @@ SolveResult SudokuSolver::solveRandomly(QVector<QVector<int>> &board, StepCallba
 
     if (board[r][c] == 0) {
         std::array<int, 9> nums = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-        thread_local std::random_device rd;
-        thread_local std::mt19937 g(rd());
-        std::shuffle(nums.begin(), nums.end(), g);
+        std::shuffle(nums.begin(), nums.end(), get_thread_local_generator());
 
         for (int num : nums) {
             if (isValid(board, r, c, num)) {
@@ -222,3 +219,7 @@ int SudokuSolver::countSolutions(QVector<QVector<int>> &board, int maxCount, int
     }
 }
 
+std::mt19937& SudokuSolver::get_thread_local_generator() {
+    thread_local std::mt19937 gen(std::random_device{}());
+    return gen;
+}

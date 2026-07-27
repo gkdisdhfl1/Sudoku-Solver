@@ -1,5 +1,8 @@
 #include "solver_worker.h"
 #include "sudoku_solver.h"
+#include "sudoku_constants.h"
+
+using namespace SudokuConstants;
 
 #include <QThread>
 
@@ -19,7 +22,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
 
 void SolverWorker::requestStop()
 {
-    QMutexLocker locker(&m_pauseMutex);
+    QMutexLocker locker(&m_pauseMutex); // wakeAll() 때문에 Mutex 필요
     m_stopRequested = true;
 
     // 잠자고 있을 수도 있는 스레드를 강제로 깨워 중단 요청을 확인하게 함
@@ -124,7 +127,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     }
 
     // 2. UI 갱신 (Throttling)
-    if(m_delay > 10 || m_updateTimer.elapsed() >= 16) {
+    if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
         auto emitStart = std::chrono::steady_clock::now();
         emit boardUpdated(currentBoard);
         m_updateTimer.restart();
