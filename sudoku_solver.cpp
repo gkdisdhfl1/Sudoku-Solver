@@ -42,6 +42,9 @@ SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm alg
     switch (algorithm) {
     case SolveAlgorithm::BackTracking:
         return solveBacktracking(board, callback, 0);
+
+    case SolveAlgorithm::Randomly:
+        return solveRandomly(board, callback, 0);
     }
     Q_UNREACHABLE();
 }
@@ -71,6 +74,7 @@ bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCa
     // 4. 셀을 하나씩 지우며 유일해 검증
     for (int idx : indices) {
         // 루프 진입 시마다 중단 요청 여부 체크
+        // 없으면 유일해 검증 중 중단이 불가능
         if (callback && !callback(board)) {
             return false;
         }
@@ -219,7 +223,7 @@ int SudokuSolver::countSolutions(QVector<QVector<int>> &board, int maxCount, int
     }
 }
 
-std::mt19937& SudokuSolver::get_thread_local_generator() {
+static std::mt19937& SudokuSolver::get_thread_local_generator() {
     thread_local std::mt19937 gen(std::random_device{}());
     return gen;
 }
