@@ -3,9 +3,11 @@
 
 #include <QVector>
 #include <functional>
+#include <random>
 
 enum class SolveAlgorithm {
     BackTracking,
+    Randomly,
     // 추후 추가
 };
 
@@ -33,18 +35,20 @@ public:
                StepCallback callback = nullptr);
 
     // 퍼즐 생성
-    void generate(QVector<QVector<int>> &board, int difficulty);
+    bool generate(QVector<QVector<int>> &board, int difficulty, StepCallback callback = nullptr);
 
     // 유일해 검증 함수
     bool hasUniqueSolution(QVector<QVector<int>>& board);
 
 private:
-    SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback  );
+    SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback, int idx = 0);
 
-    bool solveRandomly(QVector<QVector<int>> &board);
+    SolveResult solveRandomly(QVector<QVector<int>> &board, StepCallback callback, int idx = 0);
 
     // 해의 개수를 세기 위한 재귀 백트래킹 함수 (최대 2개까지만 카운트)
-    int countSolutions(QVector<QVector<int>>& board, int maxCount);
+    int countSolutions(QVector<QVector<int>>& board, int maxCount, int idx = 0);
+
+    static std::mt19937& get_thread_local_generator();
 };
 
 #endif // SUDOKU_SOLVER_H

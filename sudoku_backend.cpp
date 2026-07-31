@@ -2,8 +2,12 @@
 
 #include "sudoku_solver.h"
 
+#include "sudoku_constants.h"
+
 #include <QCoreApplication>
 #include <QThread>
+
+using namespace SudokuConstants;
 
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}
@@ -36,7 +40,7 @@ int SudokuBackend::rowCount(const QModelIndex &parent) const
     if (parent.isValid())
         return 0;
     
-    return 81; // 9x9 스도쿠 판 크기
+    return 81;
 }
 
 QVariant SudokuBackend::data(const QModelIndex &index, int role) const
@@ -169,6 +173,14 @@ bool SudokuBackend::isValidBoard() const
 // --- 메인 기능 ---
 void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
 {
+    if (m_worker) {
+        m_worker->requestStop();
+    }
+    if (m_workerThread && m_workerThread->isRunning()) {
+        m_workerThread->quit();
+        m_workerThread->wait();
+    }
+
     m_isBusy = true;
     emit isBusyChanged();
 
@@ -229,17 +241,40 @@ void SudokuBackend::togglePause()
 
     m_isPaused = !m_isPaused; // 상태 반전
 
-    // 워커의 멤버 함수를 직접 호출 (atomic 변수 조작이므로 안전)
+    // 워커의 멤버 함수를 메인 스레드에서 직접 호출
+    // setPaused() 내부는 QMutexLocker에 의해 보호되며,
+    // 일시정지 해제 시 wakeAll()로 블로킹 중인 워커 스레드를 즉시 깨워야 하므로
+    // QueuedConnection이 아닌 직접 호출이 의도적으로 필요함.
     m_worker->setPaused(m_isPaused);
 
     emit isPausedChanged();
 }
 
 // -- handler ---
-void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>> &board)
+void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>>& board)
 {
-    m_board = board;
-    emit dataChanged(index(0, 0), index(80, 0));
+    // 변경 범위의 min/max만 추척 -> dataChanged 1회
+    int lo{81}, hi{-1};
+    for (int r{0}; r < 9; ++r) {
+        // 행 단위 동치 비교
+        if (m_board[r] == board[r]) 
+            continue;
+        
+        // 변경된 행 내에서만 셀 단위 탐색
+        for (int c{0}; c < 9; ++c) {
+            if (m_board[r][c] != board[r][c]) {
+                int idx{r * 9 + c};
+                lo = std::min(lo, idx);
+                hi = idx;
+            }
+        }
+        m_board[r] = board[r]; // 변경된 행만 갱신
+    }
+
+    if (hi >= 0) {
+        // 변경 범위만 포함하는 단일 시그널 (Qt가 범위 내 data() 재질의)
+        emit dataChanged(index(lo, 0), index(hi, 0), {ValueRole});
+    }
 }
 
 void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result)
@@ -261,7 +296,11 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
             emit solveFinished(static_cast<int>(result.error()), 0); // 실패 코드(1 or 2) 및 0ms 전달
         }
     } else if (jobType == SolverWorker::JobType::Generate) {
-        emit generateFinished(result.has_value());
+        if (result.has_value()) {
+            emit generateFinished(true); 
+        } else {
+            emit generateFinished(false);
+        }
     }
 }
 
