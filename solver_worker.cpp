@@ -11,6 +11,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
                            bool visualize,
                            int delay,
                            int difficulty,
+                           int algorithm,
                            QObject *parent)
     : QObject{parent}
     , m_board(board)
@@ -18,6 +19,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
     , m_visualize(visualize)
     , m_delay(delay)
     , m_difficulty(difficulty)
+    , m_algorithm(algorithm)
 {}
 
 void SolverWorker::requestStop()
@@ -34,13 +36,25 @@ void SolverWorker::process()
     SudokuSolver solver;
     SolveResult result;
 
-    // 역할에 따른 콜백 변수 정의
-    auto stopOnlyCallback = [this](const QVector<QVector<int>>&) -> bool {
-        return !m_stopRequested;
+    // 범용 시각화 콜백
+    StepCallback universalCallback = [this](const StepInfo& info) -> bool {
+        // 부가 정보(후보 숫자)가 담겨있으면 시그널 방출
+        if (!info.candidates.isEmpty()) {
+            emit mrvStatusUpdated(info.targetRow, info.targetCol, info.candidates);
+        }
+
+        // 향후 추가될 다른 알고리즘 메시지가 있으면 방출
+        if (!info.extraMessage.isEmpty()) {
+            // emit algorithmLogUpdated(info.extraMessage);
+        }
+
+        // 기존 딜레이 및 시각화 스로틀링 수행
+        return processStep(info.board);
     };
 
-    auto visualizeCallback = [this](const QVector<QVector<int>>& board) -> bool {
-        return processStep(board);
+    // 비시각화 전용 중단 체크 콜백
+    StepCallback stopOnlyCallback = [this](const StepInfo&) -> bool {
+        return !m_stopRequested;
     };
 
     if(m_jobType == JobType::Solve) {
@@ -49,13 +63,14 @@ void SolverWorker::process()
         // 1. 전체 풀이에  걸린 총 벽시계 시간 측정 시작
         auto totalStart = std::chrono::steady_clock::now();
 
-        if(m_visualize) {
-            m_updateTimer.start(); // 타이머 시작
-            
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
+        auto algo = static_cast<SolveAlgorithm>(m_algorithm);
+
+        if (m_visualize) {
+            m_updateTimer.start();
+            result = solver.solve(m_board, algo, universalCallback);
             emit boardUpdated(m_board);
         } else {
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
+            result = solver.solve(m_board, algo, stopOnlyCallback);
         }
 
         auto totalEnd = std::chrono::steady_clock::now();

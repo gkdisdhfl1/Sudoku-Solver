@@ -105,6 +105,19 @@ void SudokuBackend::setDelay(int d)
     }
 }
 
+int SudokuBackend::algorithm() const
+{
+    return m_algorithm;
+}
+
+void SudokuBackend::setAlgorithm(int algo)
+{
+    if (m_algorithm != algo) {
+        m_algorithm = algo;
+        emit algorithmChanged();
+    }
+}
+
 bool SudokuBackend::isBusy() const
 {
     return m_isBusy;
@@ -113,6 +126,11 @@ bool SudokuBackend::isBusy() const
 bool SudokuBackend::isPaused() const
 {
     return m_isPaused;
+}
+
+QString SudokuBackend::mrvStatusText() const
+{
+    return m_mrvStatusText;
 }
 
 void SudokuBackend::setCell(int cellIndex, int value)
@@ -191,13 +209,14 @@ void SudokuBackend::startWorker(SolverWorker::JobType jobType, int difficulty)
     int delay = (jobType == SolverWorker::JobType::Solve) ? m_delay : 0;
 
     // Worker 생성 (Solve 모드)
-    m_worker = new SolverWorker(m_board, jobType, visualize, delay, difficulty);
+    m_worker = new SolverWorker(m_board, jobType, visualize, delay, difficulty, m_algorithm);
     m_worker->moveToThread(m_workerThread);
 
     // 시그널 연결
     connect(m_workerThread, &QThread::started, m_worker, &SolverWorker::process);
     connect(m_worker, &SolverWorker::boardUpdated, this, &SudokuBackend::handleBoardUpdate);
     connect(m_worker, &SolverWorker::finished, this, &SudokuBackend::handleWorkerFinished);
+    connect(m_worker, &SolverWorker::mrvStatusUpdated, this, &SudokuBackend::handleMrvStatusUpdate);
 
     // 자동 정리 연결
     connect(m_worker, &SolverWorker::finished, m_workerThread, &QThread::quit);
@@ -304,6 +323,21 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
     }
 }
 
+void SudokuBackend::handleMrvStatusUpdate(int r, int c, const QVector<int>& candidates)
+{
+    QStringList strList;
+    for (int num : candidates) {
+        strList << QString::number(num);
+    }
+
+    // 예: "Cell (3, 5) ➔ Candidates: [3, 7]"
+    m_mrvStatusText = QString("Cell (%1 %2) ➔ Candidates: [%3]")
+                        .arg(r + 1)
+                        .arg(c + 1)
+                        .arg(strList.join(", "));
+
+    emit mrvStatusTextChanged(); // QML로 UI 갱신 통보
+}
 //  --- private ---
 void SudokuBackend::checkErrors()
 {

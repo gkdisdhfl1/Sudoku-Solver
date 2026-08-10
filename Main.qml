@@ -6,7 +6,7 @@ import SudokuSolver
 pragma ComponentBehavior: Bound
 
 Window {
-    width: 550
+    width: 620
     height: 750
     visible: true
     title: qsTr("Sudoku Solver")
@@ -17,13 +17,15 @@ Window {
 
         // 비동기로 전달되는 결과를 여기서 처리
         onSolveFinished: (status, elapsedMs) => {
-                             if (status === 0) {
-                                 resultDialog.showReport(true, elapsedMs, "Backtracking");
-                             } else if (status === 1) {
-                                 resultDialog.showReport(false, 0, "Backtracking");
-                             } else if (status === 2) {
-                                 console.log("Solving was stopped by user.");
-                             }
+            let algoName = algorithmCombo.model[backend.algorithm] || "Backtracking";
+
+            if (status === 0) {
+                resultDialog.showReport(true, elapsedMs, algoName);
+            } else if (status === 1) {
+                resultDialog.showReport(false, 0, algoName);
+            } else if (status === 2) {
+                console.log("Solving was stopped by user.");
+            }
         }
     }
 
@@ -207,6 +209,41 @@ Window {
             }
         }
 
+        // MRV 후보 시각화 가이드 바
+        Rectangle {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.fillWidth: true
+            Layout.maximumWidth: 440
+            Layout.preferredHeight: 36
+
+            color: "#f8fafc"
+            radius: 8
+            border.color: "#e2e8f0"
+            border.width: 1
+
+            // MRV 실행 시 페이드인 처리
+            visible: backend.isBusy && backend.algorithm === 2
+
+            RowLayout {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "🔍 MRV Candidate:"
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: "#8e44ad"
+                }
+
+                Text {
+                    text: backend.mrvStatusText !== "" ? backend.mrvStatusText : "Analyzing candidates..."
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: "#2c3e50"
+                }
+            }
+        }
+
         // --- 시각화 설정 ---
         GroupBox {
             title: "Visualization Settings"
@@ -251,7 +288,18 @@ Window {
         // 제어 버튼
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 15
+            spacing: 12
+
+            // 알고리즘 선택 ComboBox 신설
+            ComboBox {
+                id: algorithmCombo
+                model: ["Backtracking", "Randomly", "MRV"]
+                currentIndex: backend.algorithm
+                enabled: !backend.isBusy
+
+                Layout.preferredWidth: 130
+                onCurrentIndexChanged: backend.algorithm = currentIndex
+            }
 
             // Solve / Pause / Resume 토글 버튼
             Button {
@@ -291,12 +339,12 @@ Window {
                     id: difficultyCombo
                     model: ["Easy", "Medium", "Hard"]
                     currentIndex: 0
-                    width: 100
+                    width: 90
                 }
 
                 Button {
                     text: "Generate"
-                    Layout.preferredWidth: 90
+                    Layout.preferredWidth: 85
                     onClicked: backend.generatePuzzle(difficultyCombo.currentIndex)
                 }
             }
@@ -304,7 +352,7 @@ Window {
             Button {
                 text: "Clear"
                 enabled: !backend.isBusy
-                Layout.preferredWidth: 80
+                Layout.preferredWidth: 75
                 onClicked: backend.clear()
             }
         }

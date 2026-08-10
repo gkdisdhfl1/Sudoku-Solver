@@ -21,6 +21,7 @@ public:
                           bool visualize,
                           int delay,
                           int difficulty = 0,
+                          int algorithm = 0,
                           QObject *parent = nullptr);
 
     JobType jobType() const {
@@ -36,6 +37,7 @@ signals:
     void boardUpdated(const QVector<QVector<int>> &board);
     // 성공 시 풀이 시간(int), 실패 시 예외 결과(SolveResult) 전송
     void finished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
+    void mrvStatusUpdated(int r, int c, const QVector<int>& candidates);
 
 private:
     QVector<QVector<int>> m_board;
@@ -43,6 +45,7 @@ private:
     bool m_visualize;
     int m_delay;
     int m_difficulty;
+    int m_algorithm;
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
 

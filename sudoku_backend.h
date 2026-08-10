@@ -17,8 +17,11 @@ class SudokuBackend : public QAbstractListModel
     // 시각화 관련 프로퍼티
     Q_PROPERTY(bool visualize READ visualize WRITE setVisualize NOTIFY visualizeChanged)
     Q_PROPERTY(int delay READ delay WRITE setDelay NOTIFY delayChanged )
+    Q_PROPERTY(int algorithm READ algorithm WRITE setAlgorithm NOTIFY algorithmChanged)
     Q_PROPERTY(bool isBusy READ isBusy NOTIFY isBusyChanged ) // 작업 중 여부 표시
     Q_PROPERTY(bool isPaused READ isPaused NOTIFY isPausedChanged)
+
+    Q_PROPERTY(QString mrvStatusText READ mrvStatusText NOTIFY mrvStatusTextChanged)
 
     QML_ELEMENT // QML에서 직접 사용할 수 있게 등록
 public:
@@ -39,11 +42,14 @@ public:
     // 시각화 Getter/Setter
     bool visualize() const;
     int delay() const;
+    int algorithm() const;
     bool isBusy() const;
     bool isPaused() const;
+    QString mrvStatusText() const;
 
     void setVisualize(bool v);
     void setDelay(int d);
+    void setAlgorithm(int algo);
 
 
     Q_INVOKABLE void setCell(int cellIndex, int value);
@@ -61,15 +67,18 @@ signals:
     void hasErrorsChanged();
     void visualizeChanged();
     void delayChanged();
+    void algorithmChanged();
     void isBusyChanged();
     void isPausedChanged();
     void solveFinished(int status, int elapsedMs);
     void generateFinished(bool success);
+    void mrvStatusTextChanged();
 
 private slots:
     // 워커 시그널 처리용
     void handleBoardUpdate(const QVector<QVector<int>> &board);
     void handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
+    void handleMrvStatusUpdate(int r, int c, const QVector<int>& candidates);
 
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
@@ -78,8 +87,10 @@ private:
     // 시각화 설정 변수
     bool m_visualize{false};
     int m_delay{50}; // 기본값 50ms
+    int m_algorithm{0}; // 0: BackTracking, 1: Randomly
     bool m_isBusy{false}; // 작업 중 상태
     bool m_isPaused{false};
+    QString m_mrvStatusText;
 
     // 스레드 관련
     QPointer<QThread> m_workerThread{nullptr};

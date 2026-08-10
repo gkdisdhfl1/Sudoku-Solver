@@ -40,11 +40,13 @@ bool SudokuSolver::isValid(const QVector<QVector<int>> &board, int r, int c, int
 SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
 {
     switch (algorithm) {
-    case SolveAlgorithm::BackTracking:
-        return solveBacktracking(board, callback, 0);
+        case SolveAlgorithm::BackTracking:
+            return solveBacktracking(board, callback, 0);
 
-    case SolveAlgorithm::Randomly:
-        return solveRandomly(board, callback, 0);
+        case SolveAlgorithm::Randomly:
+            return solveRandomly(board, callback, 0);
+        case SolveAlgorithm::MRV:
+            return solveMRV(board, callback);        
     }
     Q_UNREACHABLE();
 }
@@ -75,7 +77,7 @@ bool SudokuSolver::generate(QVector<QVector<int>> &board, int difficulty, StepCa
     for (int idx : indices) {
         // 루프 진입 시마다 중단 요청 여부 체크
         // 없으면 유일해 검증 중 중단이 불가능
-        if (callback && !callback(board)) {
+        if (callback && !callback({board})) {
             return false;
         }
 
@@ -124,7 +126,7 @@ SolveResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCa
 
                 // 시각화 및 중단 훅
                 if (callback) {
-                    if (!callback(board)) {
+                    if (!callback({board})) {
                         board[r][c] = 0;             // 중단 즉시 자신이 넣었던 값을 0으로 리셋
                         return SolveResult::Aborted; // 사용자가 중단 요청
                     }
@@ -143,7 +145,7 @@ SolveResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCa
 
                 // 시각화 및 중단 훅 (지울 때)
                 if (callback) {
-                    if (!callback(board))
+                    if (!callback({board}))
                         return SolveResult::Aborted; // 중단 즉시 반환
                 }
             }
@@ -171,7 +173,7 @@ SolveResult SudokuSolver::solveRandomly(QVector<QVector<int>> &board, StepCallba
             if (isValid(board, r, c, num)) {
                 board[r][c] = num;
 
-                if (callback && !callback(board)) {
+                if (callback && !callback({board})) {
                     board[r][c] = 0;
                     return SolveResult::Aborted;
                 }
@@ -185,7 +187,7 @@ SolveResult SudokuSolver::solveRandomly(QVector<QVector<int>> &board, StepCallba
                 if (result == SolveResult::Aborted)
                     return SolveResult::Aborted;
 
-                if (callback && !callback(board))
+                if (callback && !callback({board}))
                     return SolveResult::Aborted;
             }
         }
@@ -193,6 +195,81 @@ SolveResult SudokuSolver::solveRandomly(QVector<QVector<int>> &board, StepCallba
     } else {
         return solveRandomly(board, callback, idx + 1);
     }
+}
+
+SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback callback)
+{
+    int bestR{-1};
+    int bestC{-1};
+    int minOptions{10}; // 1~9보다 큰 초기값
+    QVector<int> bestValidNums;
+
+    // 1. 전체 보드를 스캔하여 잔여 유효 숫자가 가장 적은(MRV) 빈 셀 탐색
+    for (int r{0}; r < 9; ++r) {
+        for (int c{0}; c < 9; ++c) {
+            if (board[r][c] == 0) {
+                QVector<int> validNums;
+                for (int num{1}; num <= 9; ++num) {
+                    if (isValid(board, r, c, num)) {
+                        validNums.append(num);
+                    }
+                }
+
+                // 막다른 골목(들어갈 수 있는 숫자가 0개) 발견 시 즉시 백트랙
+                if (validNums.isEmpty()) {
+                    return SolveResult::Failed;
+                }
+
+                // 잔여 가능값 최저 셀 갱신
+                if (validNums.size() < minOptions) {
+                    minOptions = validNums.size();
+                    bestR = r;
+                    bestC = c;
+                    bestValidNums = validNums;
+
+                    // 1개만 가능한 제약 최상위 셀을 찾았다면 탐색 중단하고 즉시 선택 (최적화)
+                    if (minOptions == 1) break;
+                }
+            }
+        }
+        if (minOptions == 1) break;
+    }
+
+    // 더 이상 빈 셀이 없으면 완성
+    if (bestR == -1) {
+        return SolveResult::Success;
+    }
+
+    // MRV 타겟과 후보 숫자가 정해지면 외부 콜백으로 전파
+    if (callback) {
+        if (!callback({board, bestR, bestC, bestValidNums})) {
+            return SolveResult::Aborted;
+        }
+    }
+
+    // 2. 선택된 MRV 셀(bestR, bestC)에 유요한 숫자들을 대입해보며 백트래킹
+    for (int num : bestValidNums) {
+        board[bestR][bestC] = num;
+
+        if (callback && !callback({board})) {
+            board[bestR][bestC] = 0;
+            return SolveResult::Aborted;            
+        }
+
+        SolveResult result = solveMRV(board, callback);
+        if (result == SolveResult::Success)
+            return SolveResult::Success;
+
+        board[bestR][bestC] = 0; // backtrack
+
+        if (result == SolveResult::Aborted)
+            return SolveResult::Aborted;
+
+        if (callback && !callback({board}))
+            return SolveResult::Aborted;
+    }
+
+    return SolveResult::Failed;
 }
 
 int SudokuSolver::countSolutions(QVector<QVector<int>> &board, int maxCount, int idx)
@@ -223,7 +300,7 @@ int SudokuSolver::countSolutions(QVector<QVector<int>> &board, int maxCount, int
     }
 }
 
-static std::mt19937& SudokuSolver::get_thread_local_generator() {
+std::mt19937& SudokuSolver::get_thread_local_generator() {
     thread_local std::mt19937 gen(std::random_device{}());
     return gen;
 }

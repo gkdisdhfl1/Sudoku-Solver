@@ -8,7 +8,7 @@
 enum class SolveAlgorithm {
     BackTracking,
     Randomly,
-    // 추후 추가
+    MRV, // Minimum Remaining Values 휴리스틱
 };
 
 // 성공 실패, 사용자에 의한 중단을 구분하기 위한 리턴 타입 정의
@@ -18,7 +18,15 @@ enum class SolveResult {
     Aborted
 };
 
-using StepCallback = std::function<bool(const QVector<QVector<int>>&)>; // bool 리턴은 중단 여부
+struct StepInfo {
+    const QVector<QVector<int>>& board;         // 필수: 현재 9x9 보드 상태
+    int targetRow{-1};                          // 현재 주목 중인 행
+    int targetCol{-1};                          // 현재 주목 중인 열
+    QVector<int> candidates{};                  // MRV 등 후보 숫자 목록
+    QString extraMessage{};                     // 향후 DLX 등 타 알고리즘용 상용 텍스트
+};
+
+using StepCallback = std::function<bool(const StepInfo& info)>;
 
 class SudokuSolver
 {
@@ -44,6 +52,8 @@ private:
     SolveResult solveBacktracking(QVector<QVector<int>> &board, StepCallback callback, int idx = 0);
 
     SolveResult solveRandomly(QVector<QVector<int>> &board, StepCallback callback, int idx = 0);
+
+    SolveResult solveMRV(QVector<QVector<int>>& board, StepCallback callback = nullptr);
 
     // 해의 개수를 세기 위한 재귀 백트래킹 함수 (최대 2개까지만 카운트)
     int countSolutions(QVector<QVector<int>>& board, int maxCount, int idx = 0);
