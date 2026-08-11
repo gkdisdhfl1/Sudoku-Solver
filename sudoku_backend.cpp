@@ -59,6 +59,19 @@ QVariant SudokuBackend::data(const QModelIndex &index, int role) const
         return m_board[r][c];
     } else if (role == ErrorRole) {
         return m_errorCells.test(idx);
+    } else if (role == IsTargetRole) {
+        return (idx == m_targetIndex);
+    } else if (role == CandidatesRole) {
+        // 해당 빈 셀에 들어갈 수 있는 1~9 유효 후보 숫자를 즉시 계산
+        QVariantList candidateList;
+        if (m_board[r][c] == 0) {
+            for (int num = 1; num <= 9; ++num) {
+                if (SudokuSolver::isValid(m_board, r, c, num)) {
+                    candidateList.append(num);
+                }
+            }
+        }
+        return candidateList;
     }
 
     return QVariant();
@@ -69,6 +82,8 @@ QHash<int, QByteArray> SudokuBackend::roleNames() const
     QHash<int, QByteArray> roles;
     roles[ValueRole] = "value";
     roles[ErrorRole] = "isError";
+    roles[CandidatesRole] = "candidates";
+    roles[IsTargetRole] = "isTarget";
     return roles;
 }
 
@@ -291,8 +306,13 @@ void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>>& board)
     }
 
     if (hi >= 0) {
-        // 변경 범위만 포함하는 단일 시그널 (Qt가 범위 내 data() 재질의)
-        emit dataChanged(index(lo, 0), index(hi, 0), {ValueRole});
+        // 시각화 중에는 연필 자국도 전체 판에 대해 갱신 통보
+        if (m_visualize) {
+            emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole});
+        } else {
+            // 변경 범위만 포함하는 단일 시그널 (Qt가 범위 내 data() 재질의)
+            emit dataChanged(index(lo, 0), index(hi, 0), {ValueRole});
+        }
     }
 }
 
@@ -325,9 +345,22 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
 
 void SudokuBackend::handleMrvStatusUpdate(int r, int c, const QVector<int>& candidates)
 {
+    int oldTarget = m_targetIndex;
+    m_targetIndex = r * 9 + c; // 타겟 인덱스 갱신
+
+    // 이전 타겟과 신규 타겟 셀의 테투리/후보 노트를 업데이트하도록 dataChanged 통보
+    if (oldTarget >= 0 && oldTarget < 81) {
+        QModelIndex oldIdx = index(oldTarget, 0);
+        emit dataChanged(oldIdx, oldIdx, {IsTargetRole, CandidatesRole});
+    }
+    if (m_targetIndex >= 0 && m_targetIndex < 81) {
+        QModelIndex newIndex = index(m_targetIndex, 0);
+        emit dataChanged(newIndex, newIndex, {IsTargetRole, CandidatesRole});
+    }
+
     QStringList strList;
     for (int num : candidates) {
-        strList << QString::number(num);
+        strList << QString::number(num); 
     }
 
     // 예: "Cell (3, 5) ➔ Candidates: [3, 7]"

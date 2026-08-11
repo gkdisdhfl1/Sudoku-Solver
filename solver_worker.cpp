@@ -1,10 +1,9 @@
 #include "solver_worker.h"
 #include "sudoku_solver.h"
 #include "sudoku_constants.h"
+#include <QThread>
 
 using namespace SudokuConstants;
-
-#include <QThread>
 
 SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
                            JobType jobType,

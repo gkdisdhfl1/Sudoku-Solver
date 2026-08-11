@@ -31,7 +31,9 @@ public:
     // QAbstractListModel 인터페이스 오버라이드
     enum BoardRoles {
         ValueRole = Qt::UserRole + 1,
-        ErrorRole
+        ErrorRole,
+        CandidatesRole, // 1~9 유효 후보 숫자 목록
+        IsTargetRole  // 알고리즘이 주시 중인 타겟 셀 여부
     };
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
@@ -83,6 +85,7 @@ private slots:
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
     std::bitset<81> m_errorCells;
+    int m_targetIndex{-1}; // 현재 알고리즘이 주시 중인 1차원 셀 인덱스
 
     // 시각화 설정 변수
     bool m_visualize{false};
