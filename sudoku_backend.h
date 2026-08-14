@@ -17,7 +17,7 @@ class SudokuBackend : public QAbstractListModel
     // 시각화 관련 프로퍼티
     Q_PROPERTY(bool visualize READ visualize WRITE setVisualize NOTIFY visualizeChanged)
     Q_PROPERTY(int delay READ delay WRITE setDelay NOTIFY delayChanged )
-    Q_PROPERTY(int algorithm READ algorithm WRITE setAlgorithm NOTIFY algorithmChanged)
+    Q_PROPERTY(SudokuSolver::SolveAlgorithm algorithm READ algorithm WRITE setAlgorithm NOTIFY algorithmChanged)
     Q_PROPERTY(bool isBusy READ isBusy NOTIFY isBusyChanged ) // 작업 중 여부 표시
     Q_PROPERTY(bool isPaused READ isPaused NOTIFY isPausedChanged)
 
@@ -44,14 +44,14 @@ public:
     // 시각화 Getter/Setter
     bool visualize() const;
     int delay() const;
-    int algorithm() const;
+    SudokuSolver::SolveAlgorithm algorithm() const;
     bool isBusy() const;
     bool isPaused() const;
     QString mrvStatusText() const;
 
     void setVisualize(bool v);
     void setDelay(int d);
-    void setAlgorithm(int algo);
+    void setAlgorithm(SudokuSolver::SolveAlgorithm algo);
 
 
     Q_INVOKABLE void setCell(int cellIndex, int value);
@@ -85,14 +85,15 @@ private slots:
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
     std::bitset<81> m_errorCells;
+    std::array<std::bitset<9>, 81> m_candidateCache; // 81개 셀 유효 후보 비트셋 캐시
     int m_targetIndex{-1}; // 현재 알고리즘이 주시 중인 1차원 셀 인덱스
 
     // 시각화 설정 변수
     bool m_visualize{false};
     int m_delay{50}; // 기본값 50ms
-    int m_algorithm{0}; // 0: BackTracking, 1: Randomly
     bool m_isBusy{false}; // 작업 중 상태
     bool m_isPaused{false};
+    SudokuSolver::SolveAlgorithm m_algorithm{SudokuSolver::SolveAlgorithm::BackTracking};
     QString m_mrvStatusText;
 
     // 스레드 관련
@@ -101,6 +102,8 @@ private:
 
     void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
     void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
+    void recalculateAllCandidates(); // 전체 후보 캐시 재계산 헬퍼
+    void updateCandidateCacheAt(int r, int c); // 특정 셀의 후보 비트셋 캐시 갱신 헬퍼
 };
 
 #endif // SUDOKU_BACKEND_H

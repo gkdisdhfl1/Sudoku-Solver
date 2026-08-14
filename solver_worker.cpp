@@ -10,7 +10,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
                            bool visualize,
                            int delay,
                            int difficulty,
-                           int algorithm,
+                           SudokuSolver::SolveAlgorithm algorithm,
                            QObject *parent)
     : QObject{parent}
     , m_board(board)
@@ -62,14 +62,12 @@ void SolverWorker::process()
         // 1. 전체 풀이에  걸린 총 벽시계 시간 측정 시작
         auto totalStart = std::chrono::steady_clock::now();
 
-        auto algo = static_cast<SolveAlgorithm>(m_algorithm);
-
         if (m_visualize) {
             m_updateTimer.start();
-            result = solver.solve(m_board, algo, universalCallback);
+            result = solver.solve(m_board, m_algorithm, universalCallback);
             emit boardUpdated(m_board);
         } else {
-            result = solver.solve(m_board, algo, stopOnlyCallback);
+            result = solver.solve(m_board, m_algorithm, stopOnlyCallback);
         }
 
         auto totalEnd = std::chrono::steady_clock::now();

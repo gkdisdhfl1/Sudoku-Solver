@@ -4,12 +4,8 @@
 #include <QVector>
 #include <functional>
 #include <random>
-
-enum class SolveAlgorithm {
-    BackTracking,
-    Randomly,
-    MRV, // Minimum Remaining Values 휴리스틱
-};
+#include <QObject>
+#include <qtqml/qqmlregistration.h>
 
 // 성공 실패, 사용자에 의한 중단을 구분하기 위한 리턴 타입 정의
 enum class SolveResult {
@@ -18,6 +14,15 @@ enum class SolveResult {
     Aborted
 };
 
+// =======================================================================
+// StepInfo: 알고리즘 탐색 단계의 상태를 콜백으로 전달하기 위한 임시 컨텍스트 구조체
+//
+// [주의: 수명 제약 (Lifetime Constraint)]
+// - 'board' 멤버는 원본 보드에 대한 const 참조자(Non-owning Reference)임.
+// - 본 구조체는 StepCallback의 동기식 호출 스코프 내에서만 유효함.
+// - StepInfo 인스턴스를 멤버 변수에 보관하거나 다른 스레드로 비동기 전달할 경우
+//   댕글링 참조 (Dangling Reference)가 발생하므로, 반드시 보드를 복사하여 저장해야 함.
+// =======================================================================
 struct StepInfo {
     const QVector<QVector<int>>& board;         // 필수: 현재 9x9 보드 상태
     int targetRow{-1};                          // 현재 주목 중인 행
@@ -30,7 +35,17 @@ using StepCallback = std::function<bool(const StepInfo& info)>;
 
 class SudokuSolver
 {
+    Q_GADGET
+    QML_ELEMENT
+    
 public:
+    enum class SolveAlgorithm {
+        BackTracking,
+        Randomly,
+        MRV, // Minimum Remaining Values 휴리스틱
+    };
+    Q_ENUM(SolveAlgorithm)
+
     explicit SudokuSolver();
 
     // 유효성 검사

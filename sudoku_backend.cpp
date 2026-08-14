@@ -24,6 +24,9 @@ SudokuBackend::SudokuBackend(QObject *parent)
     qRegisterMetaType<std::expected<int, SolveResult>>("std::expected<int, SolveResult>");
     qRegisterMetaType<SolverWorker::JobType>("SolverWorker::JobType");
 
+    // 초기 보드에 대한 후보 캐시 계산
+    recalculateAllCandidates();
+
 }
 
 SudokuBackend::~SudokuBackend()
@@ -65,8 +68,9 @@ QVariant SudokuBackend::data(const QModelIndex &index, int role) const
         // 해당 빈 셀에 들어갈 수 있는 1~9 유효 후보 숫자를 즉시 계산
         QVariantList candidateList;
         if (m_board[r][c] == 0) {
+            const auto& bits = m_candidateCache[idx];
             for (int num = 1; num <= 9; ++num) {
-                if (SudokuSolver::isValid(m_board, r, c, num)) {
+                if (bits.test(num - 1)) {
                     candidateList.append(num);
                 }
             }
@@ -120,12 +124,12 @@ void SudokuBackend::setDelay(int d)
     }
 }
 
-int SudokuBackend::algorithm() const
+SudokuSolver::SolveAlgorithm SudokuBackend::algorithm() const
 {
     return m_algorithm;
 }
 
-void SudokuBackend::setAlgorithm(int algo)
+void SudokuBackend::setAlgorithm(SudokuSolver::SolveAlgorithm algo)
 {
     if (m_algorithm != algo) {
         m_algorithm = algo;
@@ -161,6 +165,7 @@ void SudokuBackend::setCell(int cellIndex, int value)
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
 
+        recalculateAllCandidates();
         // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
         QModelIndex modelIdx = index(cellIndex, 0);
         emit dataChanged(modelIdx, modelIdx);
@@ -181,6 +186,7 @@ void SudokuBackend::clear()
     }
     endResetModel();
 
+    recalculateAllCandidates();
     // 클리어 시 에러 초기화
     checkErrors();
 }
@@ -287,32 +293,47 @@ void SudokuBackend::togglePause()
 // -- handler ---
 void SudokuBackend::handleBoardUpdate(const QVector<QVector<int>>& board)
 {
-    // 변경 범위의 min/max만 추척 -> dataChanged 1회
-    int lo{81}, hi{-1};
+    std::vector<int> changedIndices;
+    
     for (int r{0}; r < 9; ++r) {
-        // 행 단위 동치 비교
-        if (m_board[r] == board[r]) 
+        if (m_board[r] == board[r])
             continue;
         
-        // 변경된 행 내에서만 셀 단위 탐색
         for (int c{0}; c < 9; ++c) {
             if (m_board[r][c] != board[r][c]) {
-                int idx{r * 9 + c};
-                lo = std::min(lo, idx);
-                hi = idx;
+                m_board[r][c] = board[r][c];
+                changedIndices.push_back(r * 9 + c);
             }
         }
-        m_board[r] = board[r]; // 변경된 행만 갱신
     }
 
-    if (hi >= 0) {
-        // 시각화 중에는 연필 자국도 전체 판에 대해 갱신 통보
-        if (m_visualize) {
-            emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole});
-        } else {
-            // 변경 범위만 포함하는 단일 시그널 (Qt가 범위 내 data() 재질의)
-            emit dataChanged(index(lo, 0), index(hi, 0), {ValueRole});
+    if (!changedIndices.empty() && m_visualize) {
+        // 숫자가 변경된 셀들 주변(동일 행, 열, 3x3 박스) 20여 개 셀만 캐시 갱신
+        for (int idx : changedIndices) {
+            int cr{idx / 9};
+            int cc{idx % 9};
+            int boxStartR{cr - cr % 3};
+            int boxStartC{cc - cc % 3};
+
+            // 1. 동일 행/열 캐시 갱신
+            for (int i{0}; i < 9; ++i) {
+                updateCandidateCacheAt(cr, i);
+                updateCandidateCacheAt(i, cc);
+            }
+
+            // 2. 동일 3x3 박스 캐시 갱신
+            for (int br{0}; br < 3; ++br) {
+                for(int bc{0}; bc < 3; ++bc) {
+                    updateCandidateCacheAt(boxStartR + br, boxStartC + bc);
+                }
+            }
         }
+
+        // 전체 81개 갱신 대신, 캐시가 업데이트된 상태를 Qt에 알려 O(1) 질의 유도
+        emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole});
+    } else {
+        // 비시각화 모드: 보드 변경 사항을 화면에 즉시 방출
+        emit dataChanged(index(0, 0), index(80, 0), {ValueRole});
     }
 }
 
@@ -320,8 +341,16 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
 {
     m_isBusy = false;
     m_isPaused = false;
+    m_targetIndex = -1;
+    m_mrvStatusText.clear();
     emit isBusyChanged();
     emit isPausedChanged();
+    emit mrvStatusTextChanged();
+    emit dataChanged(index(0, 0), index(80, 0), {IsTargetRole});
+
+    // 최종 상태 캐시 동기화 및 뷰 전체 갱신
+    recalculateAllCandidates();
+    emit dataChanged(index(0, 0), index(80, 0));
 
     m_worker = nullptr;
     m_workerThread = nullptr; // deleteLater로 삭제되므로 포인터만 null 처리
@@ -348,7 +377,7 @@ void SudokuBackend::handleMrvStatusUpdate(int r, int c, const QVector<int>& cand
     int oldTarget = m_targetIndex;
     m_targetIndex = r * 9 + c; // 타겟 인덱스 갱신
 
-    // 이전 타겟과 신규 타겟 셀의 테투리/후보 노트를 업데이트하도록 dataChanged 통보
+    // 이전 타겟과 신규 타겟 셀의 테두리/후보 노트를 업데이트하도록 dataChanged 통보
     if (oldTarget >= 0 && oldTarget < 81) {
         QModelIndex oldIdx = index(oldTarget, 0);
         emit dataChanged(oldIdx, oldIdx, {IsTargetRole, CandidatesRole});
@@ -403,6 +432,29 @@ void SudokuBackend::checkErrors()
             if(changed.test(idx)) {
                 QModelIndex modelIdx = index(idx, 0);
                 emit dataChanged(modelIdx, modelIdx, {ErrorRole});
+            }
+        }
+    }
+}
+
+void SudokuBackend::recalculateAllCandidates()
+{
+    for(int r{0}; r < 9; ++r) {
+        for(int c{0}; c < 9; ++c) {
+            updateCandidateCacheAt(r, c);
+        }
+    }
+}
+
+void SudokuBackend::updateCandidateCacheAt(int r, int c)
+{
+    int idx{r * 9 + c};
+    m_candidateCache[idx].reset();
+
+    if (m_board[r][c] == 0) {
+        for (int num{1}; num <= 9; ++num) {
+            if (SudokuSolver::isValid(m_board, r, c, num)) {
+                m_candidateCache[idx].set(num - 1); // 1~9 숫자를 0~8 비트에 저장
             }
         }
     }

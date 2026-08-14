@@ -21,7 +21,7 @@ public:
                           bool visualize,
                           int delay,
                           int difficulty = 0,
-                          int algorithm = 0,
+                          SudokuSolver::SolveAlgorithm algorithm = SudokuSolver::SolveAlgorithm::BackTracking,
                           QObject *parent = nullptr);
 
     JobType jobType() const {
@@ -45,7 +45,7 @@ private:
     bool m_visualize;
     int m_delay;
     int m_difficulty;
-    int m_algorithm;
+    SudokuSolver::SolveAlgorithm m_algorithm;
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
 

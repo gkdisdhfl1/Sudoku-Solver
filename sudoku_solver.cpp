@@ -247,7 +247,7 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
         }
     }
 
-    // 2. 선택된 MRV 셀(bestR, bestC)에 유요한 숫자들을 대입해보며 백트래킹
+    // 2. 선택된 MRV 셀(bestR, bestC)에 유효한 숫자들을 대입해보며 백트래킹
     for (int num : bestValidNums) {
         board[bestR][bestC] = num;
 

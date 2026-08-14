@@ -17,7 +17,7 @@ Window {
 
         // 비동기로 전달되는 결과를 여기서 처리
         onSolveFinished: (status, elapsedMs) => {
-            let algoName = algorithmCombo.model[backend.algorithm] || "Backtracking";
+            let algoName = algorithmCombo.currentText;
 
             if (status === 0) {
                 resultDialog.showReport(true, elapsedMs, algoName);
@@ -257,7 +257,7 @@ Window {
             border.width: 1
 
             // MRV 실행 시 페이드인 처리
-            visible: backend.isBusy && backend.algorithm === 2
+            visible: backend.isBusy && backend.algorithm === SudokuSolver.MRV
 
             RowLayout {
                 anchors.centerIn: parent
