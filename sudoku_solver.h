@@ -15,7 +15,7 @@ enum class SolveResult {
 };
 
 // =======================================================================
-// StepInfo: 알고리즘 탐색 단계의 상태를 콜백으로 전달하기 위한 임시 컨텍스트 구조체
+// StepInfo: 탐색 단계 상태 콜백으로 전달 및 스레드 간 시그널 전송을 위한 통합 데이터 객체
 //
 // [주의: 수명 제약 (Lifetime Constraint)]
 // - 'board' 멤버는 원본 보드에 대한 const 참조자(Non-owning Reference)임.
@@ -24,12 +24,13 @@ enum class SolveResult {
 //   댕글링 참조 (Dangling Reference)가 발생하므로, 반드시 보드를 복사하여 저장해야 함.
 // =======================================================================
 struct StepInfo {
-    const QVector<QVector<int>>& board;         // 필수: 현재 9x9 보드 상태
+    QVector<QVector<int>> board;         // 필수: 현재 9x9 보드 상태
     int targetRow{-1};                          // 현재 주목 중인 행
     int targetCol{-1};                          // 현재 주목 중인 열
     QVector<int> candidates{};                  // MRV 등 후보 숫자 목록
     QString extraMessage{};                     // 향후 DLX 등 타 알고리즘용 상용 텍스트
 };
+Q_DECLARE_METATYPE(StepInfo)
 
 using StepCallback = std::function<bool(const StepInfo& info)>;
 

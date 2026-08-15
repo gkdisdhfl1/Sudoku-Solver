@@ -34,10 +34,9 @@ public slots:
     void setPaused(bool paused); // 일시 정지 제어
 
 signals:
-    void boardUpdated(const QVector<QVector<int>> &board);
+    void stepUpdated(const StepInfo& info);
     // 성공 시 풀이 시간(int), 실패 시 예외 결과(SolveResult) 전송
     void finished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
-    void mrvStatusUpdated(int r, int c, const QVector<int>& candidates);
 
 private:
     QVector<QVector<int>> m_board;

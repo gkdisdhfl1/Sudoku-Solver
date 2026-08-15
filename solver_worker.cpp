@@ -37,15 +37,8 @@ void SolverWorker::process()
 
     // 범용 시각화 콜백
     StepCallback universalCallback = [this](const StepInfo& info) -> bool {
-        // 부가 정보(후보 숫자)가 담겨있으면 시그널 방출
-        if (!info.candidates.isEmpty()) {
-            emit mrvStatusUpdated(info.targetRow, info.targetCol, info.candidates);
-        }
-
-        // 향후 추가될 다른 알고리즘 메시지가 있으면 방출
-        if (!info.extraMessage.isEmpty()) {
-            // emit algorithmLogUpdated(info.extraMessage);
-        }
+        // 수신받은 info 객체를 시그널로 그대로 전달 (포인터 얕은 복사 수준)
+        emit stepUpdated(info);
 
         // 기존 딜레이 및 시각화 스로틀링 수행
         return processStep(info.board);
@@ -65,7 +58,7 @@ void SolverWorker::process()
         if (m_visualize) {
             m_updateTimer.start();
             result = solver.solve(m_board, m_algorithm, universalCallback);
-            emit boardUpdated(m_board);
+            emit stepUpdated(StepInfo{m_board});
         } else {
             result = solver.solve(m_board, m_algorithm, stopOnlyCallback);
         }
@@ -84,7 +77,7 @@ void SolverWorker::process()
         );
 
         if (result == SolveResult::Success) {
-            emit boardUpdated(m_board);
+            emit stepUpdated(StepInfo{m_board});
             // 성공 : elapsedMs 데이터 주입
             emit finished(m_jobType, static_cast<int>(pureElapsedMs));
         } else {
@@ -93,7 +86,7 @@ void SolverWorker::process()
         }
     } else if(m_jobType == JobType::Generate) {
         bool success = solver.generate(m_board, m_difficulty, stopOnlyCallback);
-        emit boardUpdated(m_board);
+        emit stepUpdated(StepInfo{m_board});
 
         if (success) {
             // 생성 성공 시 0ms 및 Success 반환
@@ -141,7 +134,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     // 2. UI 갱신 (Throttling)
     if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
         auto emitStart = std::chrono::steady_clock::now();
-        emit boardUpdated(currentBoard);
+        emit stepUpdated(StepInfo{currentBoard});
         m_updateTimer.restart();
         m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - emitStart); // 시그널 오버헤드 합산
     }

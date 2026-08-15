@@ -78,9 +78,8 @@ signals:
 
 private slots:
     // 워커 시그널 처리용
-    void handleBoardUpdate(const QVector<QVector<int>> &board);
+    void handleStepUpdate(const StepInfo& info);
     void handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
-    void handleMrvStatusUpdate(int r, int c, const QVector<int>& candidates);
 
 private:
     QVector<QVector<int>> m_board; // 0~80, 0 means empty
