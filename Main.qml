@@ -6,7 +6,7 @@ import SudokuSolver
 pragma ComponentBehavior: Bound
 
 Window {
-    width: 550
+    width: 620
     height: 750
     visible: true
     title: qsTr("Sudoku Solver")
@@ -17,13 +17,15 @@ Window {
 
         // 비동기로 전달되는 결과를 여기서 처리
         onSolveFinished: (status, elapsedMs) => {
-                             if (status === 0) {
-                                 resultDialog.showReport(true, elapsedMs, "Backtracking");
-                             } else if (status === 1) {
-                                 resultDialog.showReport(false, 0, "Backtracking");
-                             } else if (status === 2) {
-                                 console.log("Solving was stopped by user.");
-                             }
+            let algoName = algorithmCombo.currentText;
+
+            if (status === 0) {
+                resultDialog.showReport(true, elapsedMs, algoName);
+            } else if (status === 1) {
+                resultDialog.showReport(false, 0, algoName);
+            } else if (status === 2) {
+                console.log("Solving was stopped by user.");
+            }
         }
     }
 
@@ -77,6 +79,9 @@ Window {
                     required property int index
                     required property int value // display 롤에 바인딩된 변수
                     required property bool isError
+                    required property var candidates // C++ CandidatesRole 수신
+                    required property bool isTarget // C++ IsTargetRole 수신
+
                     readonly property int row: Math.floor(index / 9)
                     readonly property int col: index % 9
                     readonly property int blockRow: Math.floor(row / 3)
@@ -88,14 +93,46 @@ Window {
                     implicitWidth: 48
                     implicitHeight: 48
 
-                    // 포커스를 획득했을 때 연한 파란색 하이라이트
+                    // 타겟 셀일 때 연한 파란색 하이라이트
                     color: inputField.activeFocus
-                        ? /*"#d6ffeb"*/ "#d6e4ff"
-                        : (isError ? "#ffcccc" : (isDarkBlock ? "#ecf0f1" : "#ffffff"))
+                        ? "#d6e4ff"
+                        : (isError 
+                            ? "#ffcccc" 
+                            : (isDarkBlock ? "#ecf0f1" : "#ffffff"))
 
-                    border.color: "#bdc3c7"
-                    border.width: 1
+                    border.color: isTarget ? "#8e44ad" : "#bdc3c7"
+                    border.width: isTarget ? 2 : 1
 
+                    // ---------------------------------------------------
+                    // 3x3 연필 자국 소형 노트 오버레이 (빈 셀일 때만 표시)
+                    // ---------------------------------------------------
+                    GridLayout {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        columns: 3
+                        rows: 3
+                        visible: cell.value === 0 && backend.visualize
+
+                        Repeater {
+                            model: 9 // 1~9 위치
+                            Text {
+                                required property int index
+                                readonly property int num: index + 1
+                                readonly property bool isPossible: cell.candidates ? cell.candidates.includes(num) : false
+
+                                text: isPossible ? num.toString() : ""
+                                font.pixelSize: 9
+                                font.bold: cell.isTarget
+                                color: cell.isTarget ? "#8e44ad" : "#94a3b8" // 타겟이면 진한 보라색
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                            }
+                        }
+                    }
+
+                    
                     // 외부에서 포커스 요청 시 텍스트 필드를 활성화하는 헬퍼
                     function focusInput() {
                         inputField.forceActiveFocus();
@@ -207,6 +244,41 @@ Window {
             }
         }
 
+        // MRV 후보 시각화 가이드 바
+        Rectangle {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.fillWidth: true
+            Layout.maximumWidth: 440
+            Layout.preferredHeight: 36
+
+            color: "#f8fafc"
+            radius: 8
+            border.color: "#e2e8f0"
+            border.width: 1
+
+            // MRV 실행 시 페이드인 처리
+            visible: backend.isBusy && backend.algorithm === SudokuSolver.MRV
+
+            RowLayout {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "🔍 MRV Candidate:"
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: "#8e44ad"
+                }
+
+                Text {
+                    text: backend.mrvStatusText !== "" ? backend.mrvStatusText : "Analyzing candidates..."
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: "#2c3e50"
+                }
+            }
+        }
+
         // --- 시각화 설정 ---
         GroupBox {
             title: "Visualization Settings"
@@ -251,7 +323,18 @@ Window {
         // 제어 버튼
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 15
+            spacing: 12
+
+            // 알고리즘 선택 ComboBox 신설
+            ComboBox {
+                id: algorithmCombo
+                model: ["Backtracking", "Randomly", "MRV"]
+                currentIndex: backend.algorithm
+                enabled: !backend.isBusy
+
+                Layout.preferredWidth: 130
+                onCurrentIndexChanged: backend.algorithm = currentIndex
+            }
 
             // Solve / Pause / Resume 토글 버튼
             Button {
@@ -291,12 +374,12 @@ Window {
                     id: difficultyCombo
                     model: ["Easy", "Medium", "Hard"]
                     currentIndex: 0
-                    width: 100
+                    width: 90
                 }
 
                 Button {
                     text: "Generate"
-                    Layout.preferredWidth: 90
+                    Layout.preferredWidth: 85
                     onClicked: backend.generatePuzzle(difficultyCombo.currentIndex)
                 }
             }
@@ -304,7 +387,7 @@ Window {
             Button {
                 text: "Clear"
                 enabled: !backend.isBusy
-                Layout.preferredWidth: 80
+                Layout.preferredWidth: 75
                 onClicked: backend.clear()
             }
         }

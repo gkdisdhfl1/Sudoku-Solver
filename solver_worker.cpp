@@ -1,16 +1,16 @@
 #include "solver_worker.h"
 #include "sudoku_solver.h"
 #include "sudoku_constants.h"
+#include <QThread>
 
 using namespace SudokuConstants;
-
-#include <QThread>
 
 SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
                            JobType jobType,
                            bool visualize,
                            int delay,
                            int difficulty,
+                           SudokuSolver::SolveAlgorithm algorithm,
                            QObject *parent)
     : QObject{parent}
     , m_board(board)
@@ -18,6 +18,7 @@ SolverWorker::SolverWorker(const QVector<QVector<int>> &board,
     , m_visualize(visualize)
     , m_delay(delay)
     , m_difficulty(difficulty)
+    , m_algorithm(algorithm)
 {}
 
 void SolverWorker::requestStop()
@@ -34,13 +35,18 @@ void SolverWorker::process()
     SudokuSolver solver;
     SolveResult result;
 
-    // 역할에 따른 콜백 변수 정의
-    auto stopOnlyCallback = [this](const QVector<QVector<int>>&) -> bool {
-        return !m_stopRequested;
+    // 범용 시각화 콜백
+    StepCallback universalCallback = [this](const StepInfo& info) -> bool {
+        // 수신받은 info 객체를 시그널로 그대로 전달 (포인터 얕은 복사 수준)
+        emit stepUpdated(info);
+
+        // 기존 딜레이 및 시각화 스로틀링 수행
+        return processStep(info.board);
     };
 
-    auto visualizeCallback = [this](const QVector<QVector<int>>& board) -> bool {
-        return processStep(board);
+    // 비시각화 전용 중단 체크 콜백
+    StepCallback stopOnlyCallback = [this](const StepInfo&) -> bool {
+        return !m_stopRequested;
     };
 
     if(m_jobType == JobType::Solve) {
@@ -49,13 +55,12 @@ void SolverWorker::process()
         // 1. 전체 풀이에  걸린 총 벽시계 시간 측정 시작
         auto totalStart = std::chrono::steady_clock::now();
 
-        if(m_visualize) {
-            m_updateTimer.start(); // 타이머 시작
-            
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, visualizeCallback);
-            emit boardUpdated(m_board);
+        if (m_visualize) {
+            m_updateTimer.start();
+            result = solver.solve(m_board, m_algorithm, universalCallback);
+            emit stepUpdated(StepInfo{m_board});
         } else {
-            result = solver.solve(m_board, SolveAlgorithm::BackTracking, stopOnlyCallback);
+            result = solver.solve(m_board, m_algorithm, stopOnlyCallback);
         }
 
         auto totalEnd = std::chrono::steady_clock::now();
@@ -72,7 +77,7 @@ void SolverWorker::process()
         );
 
         if (result == SolveResult::Success) {
-            emit boardUpdated(m_board);
+            emit stepUpdated(StepInfo{m_board});
             // 성공 : elapsedMs 데이터 주입
             emit finished(m_jobType, static_cast<int>(pureElapsedMs));
         } else {
@@ -81,7 +86,7 @@ void SolverWorker::process()
         }
     } else if(m_jobType == JobType::Generate) {
         bool success = solver.generate(m_board, m_difficulty, stopOnlyCallback);
-        emit boardUpdated(m_board);
+        emit stepUpdated(StepInfo{m_board});
 
         if (success) {
             // 생성 성공 시 0ms 및 Success 반환
@@ -129,7 +134,7 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     // 2. UI 갱신 (Throttling)
     if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
         auto emitStart = std::chrono::steady_clock::now();
-        emit boardUpdated(currentBoard);
+        emit stepUpdated(StepInfo{currentBoard});
         m_updateTimer.restart();
         m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - emitStart); // 시그널 오버헤드 합산
     }

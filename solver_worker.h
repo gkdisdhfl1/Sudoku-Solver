@@ -21,6 +21,7 @@ public:
                           bool visualize,
                           int delay,
                           int difficulty = 0,
+                          SudokuSolver::SolveAlgorithm algorithm = SudokuSolver::SolveAlgorithm::BackTracking,
                           QObject *parent = nullptr);
 
     JobType jobType() const {
@@ -33,7 +34,7 @@ public slots:
     void setPaused(bool paused); // 일시 정지 제어
 
 signals:
-    void boardUpdated(const QVector<QVector<int>> &board);
+    void stepUpdated(const StepInfo& info);
     // 성공 시 풀이 시간(int), 실패 시 예외 결과(SolveResult) 전송
     void finished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
 
@@ -43,6 +44,7 @@ private:
     bool m_visualize;
     int m_delay;
     int m_difficulty;
+    SudokuSolver::SolveAlgorithm m_algorithm;
     std::atomic_bool m_stopRequested{false};
     QElapsedTimer m_updateTimer;
 
