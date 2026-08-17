@@ -166,7 +166,8 @@ void SudokuBackend::setCell(int cellIndex, int value)
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
 
-        recalculateAllCandidates();
+        updatePeerCandidatesAt(r, c);
+
         // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
         QModelIndex modelIdx = index(cellIndex, 0);
         emit dataChanged(modelIdx, modelIdx);
@@ -361,17 +362,7 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
 
     if (!changedIndices.empty() && m_visualize) {
         for (int idx : changedIndices) {
-            int cr{idx / 9}, cc{idx % 9};
-            int boxStartR{cr - cr % 3}, boxStartC{cc - cc % 3};
-            for (int i{0}; i < 9; ++i) {
-                updateCandidateCacheAt(cr, i);
-                updateCandidateCacheAt(i, cc);
-            }
-            for (int br{0}; br < 3; ++br) {
-                for (int bc{0}; bc < 3; ++bc) {
-                    updateCandidateCacheAt(boxStartR + br, boxStartC + bc);
-                }
-            }
+           updatePeerCandidatesAt(idx / 9, idx % 9);
         }
     }
 
@@ -435,6 +426,28 @@ void SudokuBackend::updateCandidateCacheAt(int r, int c)
             if (SudokuSolver::isValid(m_board, r, c, num)) {
                 m_candidateCache[idx].set(num - 1); // 1~9 숫자를 0~8 비트에 저장
             }
+        }
+    }
+}
+
+void SudokuBackend::updatePeerCandidatesAt(int r, int c)
+{
+    int boxStartR{r - r % 3};
+    int boxStartC{c - c % 3};
+
+    // 1. 해당 셀 자체 캐시 갱신
+    updateCandidateCacheAt(r, c);
+
+    // 2. 동일 행 및 동일 열 캐시 갱신
+    for (int i{0}; i < 9; ++i) {
+        updateCandidateCacheAt(r, i);
+        updateCandidateCacheAt(i, c);
+    }
+
+    // 3. 동일 3x3 박스 캐시 갱신
+    for (int br{0}; br < 3; ++br) {
+        for (int bc{0}; bc < 3; ++bc) {
+            updateCandidateCacheAt(boxStartR + br, boxStartC + bc);
         }
     }
 }

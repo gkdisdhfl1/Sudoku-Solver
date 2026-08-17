@@ -103,6 +103,7 @@ private:
     void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
     void recalculateAllCandidates(); // 전체 후보 캐시 재계산 헬퍼
     void updateCandidateCacheAt(int r, int c); // 특정 셀의 후보 비트셋 캐시 갱신 헬퍼
+    void updatePeerCandidatesAt(int r, int c); // 특정 셀과 연관된 20여 개 셀 캐시 증분 갱신
 };
 
 #endif // SUDOKU_BACKEND_H
