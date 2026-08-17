@@ -301,10 +301,11 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
     emit isBusyChanged();
     emit isPausedChanged();
     emit mrvStatusTextChanged();
-    emit dataChanged(index(0, 0), index(80, 0), {IsTargetRole});
 
     // 최종 상태 캐시 동기화 및 뷰 전체 갱신
     recalculateAllCandidates();
+
+    // 전체 역할 갱신 (IsTargetRole 포함)
     emit dataChanged(index(0, 0), index(80, 0));
 
     m_worker = nullptr;
@@ -360,9 +361,17 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
         }
     }
 
+    // [캐시 갱신 및 불변성 설계 의도]
+    // 1. 시각화 모드(m_visualize == true):
+    //   - 매 스텝마다 변경된 셀 주변 20여 개 셀의 후보 캐시를 증분 갱신하여 3x3 노트를 실시간 반영함.
+    // 2. 비시각화 모드(m_visualize == false):
+    //   - 풀이 속도를 위해 중간 스텝의 캐시 계산을 의도적으로 생략함.
+    //   - 최종 보드의 후보 캐시 동기화는 작업 완료 시 handleWorkerFinished()의
+    //     recalculateAllCandidate()에서 100% 보장되므로 데이터 일관성이 안전하게 유지됨.
     if (!changedIndices.empty() && m_visualize) {
+        std::bitset<81> updatedMask;
         for (int idx : changedIndices) {
-           updatePeerCandidatesAt(idx / 9, idx % 9);
+           updatePeerCandidatesAt(idx / 9, idx % 9, &updatedMask);
         }
     }
 
@@ -430,24 +439,38 @@ void SudokuBackend::updateCandidateCacheAt(int r, int c)
     }
 }
 
-void SudokuBackend::updatePeerCandidatesAt(int r, int c)
+void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* updatedMask)
 {
     int boxStartR{r - r % 3};
     int boxStartC{c - c % 3};
 
+    // 외부에서 마스크를 안 주면 내부에서 로컬 마스크 생성
+    std::bitset<81> localMask;
+    std::bitset<81>& mask = updatedMask ? *updatedMask : localMask;
+
+    // 이미 방문한 셀은 건너뛰고 최초 1회만 계산
+    auto updateOnce = [this, updatedMask](int row, int col) {
+        int idx{row * 9 + col};
+        if (!updatedMask || !updatedMask->test(idx)) {
+            if (updatedMask)
+                updatedMask->set(idx);
+            updateCandidateCacheAt(row, col);
+        }
+    };
+
     // 1. 해당 셀 자체 캐시 갱신
-    updateCandidateCacheAt(r, c);
+    updateOnce(r, c);
 
     // 2. 동일 행 및 동일 열 캐시 갱신
     for (int i{0}; i < 9; ++i) {
-        updateCandidateCacheAt(r, i);
-        updateCandidateCacheAt(i, c);
+        updateOnce(r, i);
+        updateOnce(i, c);
     }
 
     // 3. 동일 3x3 박스 캐시 갱신
     for (int br{0}; br < 3; ++br) {
         for (int bc{0}; bc < 3; ++bc) {
-            updateCandidateCacheAt(boxStartR + br, boxStartC + bc);
+            updateOnce(boxStartR + br, boxStartC + bc);
         }
     }
 }

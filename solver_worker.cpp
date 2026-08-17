@@ -33,7 +33,7 @@ void SolverWorker::requestStop()
 void SolverWorker::process()
 {
     SudokuSolver solver;
-    SolveResult result;
+    SolveResult result{SolveResult::Failed};
 
     // 범용 시각화 콜백
     StepCallback universalCallback = [this](const StepInfo& info) -> bool {

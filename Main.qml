@@ -328,12 +328,27 @@ Window {
             // 알고리즘 선택 ComboBox 신설
             ComboBox {
                 id: algorithmCombo
-                model: ["Backtracking", "Randomly", "MRV"]
-                currentIndex: backend.algorithm
-                enabled: !backend.isBusy
+                textRole: "text"
+                valueRole: "value"
+                model: [
+                    { text : "Backtracking", value: SudokuSolver.Backtracking },
+                    { text : "Randomly", value: SudokuSolver.Randomly },
+                    { text : "MRV", value: SudokuSolver.MRV }
+                ]
 
+                // C++ 백엔드 상태와 ComboBox 인덱스 동기화
+                // 초기 로딩 타이밍 이슈로 -1이 나오면 기본값 0번 선택
+                currentIndex: {
+                    let idx = indexOfValue(backend.algorithm);
+                    return idx >= 0 ? idx : 0;
+                }
+                enabled: !backend.isBusy
                 Layout.preferredWidth: 130
-                onCurrentIndexChanged: backend.algorithm = currentIndex
+
+                // 사용자가 직접 항목을 선택했을 때만 안전한 enum 값 대입
+                onActivated: (index) => {
+                    backend.algorithm = currentValue;
+                }
             }
 
             // Solve / Pause / Resume 토글 버튼
