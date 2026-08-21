@@ -15,20 +15,17 @@ enum class SolveResult {
 };
 
 // =======================================================================
-// StepInfo: 탐색 단계 상태 콜백으로 전달 및 스레드 간 시그널 전송을 위한 통합 데이터 객체
+// StepInfo: 탐색 단계 상태 전달 및 스레드 간 비동기 전송을 위한 통합 데이터 객체
 //
-// [주의: 수명 제약 (Lifetime Constraint)]
-// - 'board' 멤버는 원본 보드에 대한 const 참조자(Non-owning Reference)임.
-// - 본 구조체는 StepCallback의 동기식 호출 스코프 내에서만 유효함.
-// - StepInfo 인스턴스를 멤버 변수에 보관하거나 다른 스레드로 비동기 전달할 경우
-//   댕글링 참조 (Dangling Reference)가 발생하므로, 반드시 보드를 복사하여 저장해야 함.
+// - QVector의 암시적 공유(Copy-on-Write)를 지원하여 값 복사 비용이 O(1)으로 가벼움.
+// - Q_DECLARE_METATYPE 등록을 통해 스레드 간 큐 전송(QueuedConnection) 및 보관이 안전함.
 // =======================================================================
 struct StepInfo {
-    QVector<QVector<int>> board;         // 필수: 현재 9x9 보드 상태
+    QVector<QVector<int>> board{};         // 필수: 현재 9x9 보드 상태
     int targetRow{-1};                          // 현재 주목 중인 행
     int targetCol{-1};                          // 현재 주목 중인 열
     QVector<int> candidates{};                  // MRV 등 후보 숫자 목록
-    QString extraMessage{};                     // 향후 DLX 등 타 알고리즘용 상용 텍스트
+    QString extraMessage{};                     // 알고리즘 상태 설명 텍스트
 };
 Q_DECLARE_METATYPE(StepInfo)
 

@@ -241,15 +241,8 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
     }
 
     // 후보 숫자가 정해지면 외부 콜백으로 전파
-    QString msg;
     if (callback) {
-        QStringList strList;
-        for (int num : bestValidNums)
-            strList << QString::number(num);
-        msg = QString("Cell (%1, %2) ➔ Candidates: [%3]")
-                        .arg(bestR + 1).arg(bestC + 1).arg(strList.join(", "));
-
-        if (!callback({board, bestR, bestC, bestValidNums, msg})) {
+        if (!callback({board, bestR, bestC, bestValidNums})) {
             return SolveResult::Aborted;
         }
     }
@@ -258,7 +251,7 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
     for (int num : bestValidNums) {
         board[bestR][bestC] = num;
 
-        if (callback && !callback({board, bestR, bestC, bestValidNums, msg})) {
+        if (callback && !callback({board, bestR, bestC, bestValidNums})) {
             board[bestR][bestC] = 0;
             return SolveResult::Aborted;            
         }
@@ -272,7 +265,7 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
         if (result == SolveResult::Aborted)
             return SolveResult::Aborted;
 
-        if (callback && !callback({board, bestR, bestC, bestValidNums, msg}))
+        if (callback && !callback({board, bestR, bestC, bestValidNums}))
             return SolveResult::Aborted;
     }
 

@@ -335,9 +335,23 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
                     ? (info.targetRow * 9 + info.targetCol)
                     : -1;
     
-    // 2. 알고리즘이 실어 보낸 메시지를 그대로 반영
-    if (!info.candidates.isEmpty() && m_statusMessage != info.extraMessage) {
-        m_statusMessage = info.extraMessage;
+    // 2. 메시지 생성 및 반영
+    QString newMsg;
+    if (!info.extraMessage.isEmpty()) {
+        newMsg = info.extraMessage;  
+    } else if (info.targetRow >= 0 && info.targetCol >= 0 && !info.candidates.isEmpty()) {
+        // 원시 데이터(행/열/후보)를 바탕으로 UI 문자열 가공
+        QStringList strList;
+        for (int num : info.candidates)
+            strList << QString::number(num);
+        newMsg = QString("Cell (%1, %2) ➔ Candidates: [%3]")
+            .arg(info.targetRow + 1)
+            .arg(info.targetCol + 1)
+            .arg(strList.join(", "));
+    }
+
+    if (m_statusMessage != newMsg) {
+        m_statusMessage = newMsg;
         emit statusMessageChanged();
     }
 
@@ -439,7 +453,6 @@ void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* update
 
     // 외부에서 마스크를 안 주면 내부에서 로컬 마스크 생성
     std::bitset<81> localMask;
-    std::bitset<81>& mask = updatedMask ? *updatedMask : localMask;
 
     // 이미 방문한 셀은 건너뛰고 최초 1회만 계산
     auto updateOnce = [this, updatedMask](int row, int col) {

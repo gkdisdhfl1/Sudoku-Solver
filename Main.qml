@@ -331,7 +331,7 @@ Window {
                 textRole: "text"
                 valueRole: "value"
                 model: [
-                    { text : "Backtracking", value: SudokuSolver.Backtracking },
+                    { text : "Backtracking", value: SudokuSolver.BackTracking },
                     { text : "Randomly", value: SudokuSolver.Randomly },
                     { text : "MRV", value: SudokuSolver.MRV }
                 ]

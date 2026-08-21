@@ -37,11 +37,7 @@ void SolverWorker::process()
 
     // 범용 시각화 콜백
     StepCallback universalCallback = [this](const StepInfo& info) -> bool {
-        // 수신받은 info 객체를 시그널로 그대로 전달 (포인터 얕은 복사 수준)
-        emit stepUpdated(info);
-
-        // 기존 딜레이 및 시각화 스로틀링 수행
-        return processStep(info.board);
+        return processStep(info);
     };
 
     // 비시각화 전용 중단 체크 콜백
@@ -113,7 +109,7 @@ void SolverWorker::setPaused(bool paused)
     }
 }
 
-bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
+bool SolverWorker::processStep(const StepInfo& info)
 {
     if(m_stopRequested) return false;
 
@@ -134,7 +130,9 @@ bool SolverWorker::processStep(const QVector<QVector<int>>& currentBoard)
     // 2. UI 갱신 (Throttling)
     if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
         auto emitStart = std::chrono::steady_clock::now();
-        emit stepUpdated(StepInfo{currentBoard});
+        
+        emit stepUpdated(info);
+
         m_updateTimer.restart();
         m_accumulatedOverheadTime += (std::chrono::steady_clock::now() - emitStart); // 시그널 오버헤드 합산
     }
