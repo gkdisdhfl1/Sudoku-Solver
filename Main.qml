@@ -244,7 +244,7 @@ Window {
             }
         }
 
-        // MRV 후보 시각화 가이드 바
+        // 실시간 알고리즘 탐색 가이드 바
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
             Layout.fillWidth: true
@@ -257,21 +257,21 @@ Window {
             border.width: 1
 
             // MRV 실행 시 페이드인 처리
-            visible: backend.isBusy && backend.algorithm === SudokuSolver.MRV
+            visible: backend.isBusy && backend.statusMessage !== ""
 
             RowLayout {
                 anchors.centerIn: parent
                 spacing: 8
 
                 Text {
-                    text: "🔍 MRV Candidate:"
+                    text: "🔍 Step Info:"
                     font.pixelSize: 13
                     font.bold: true
                     color: "#8e44ad"
                 }
 
                 Text {
-                    text: backend.mrvStatusText !== "" ? backend.mrvStatusText : "Analyzing candidates..."
+                    text: backend.statusMessage
                     font.pixelSize: 13
                     font.bold: true
                     color: "#2c3e50"

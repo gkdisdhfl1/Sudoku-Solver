@@ -148,9 +148,9 @@ bool SudokuBackend::isPaused() const
     return m_isPaused;
 }
 
-QString SudokuBackend::mrvStatusText() const
+QString SudokuBackend::statusMessage() const
 {
-    return m_mrvStatusText;
+    return m_statusMessage;
 }
 
 void SudokuBackend::setCell(int cellIndex, int value)
@@ -297,10 +297,10 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
     m_isBusy = false;
     m_isPaused = false;
     m_targetIndex = -1;
-    m_mrvStatusText.clear();
+    m_statusMessage.clear();
     emit isBusyChanged();
     emit isPausedChanged();
-    emit mrvStatusTextChanged();
+    emit statusMessageChanged();
 
     // 최종 상태 캐시 동기화 및 뷰 전체 갱신
     recalculateAllCandidates();
@@ -335,20 +335,13 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
                     ? (info.targetRow * 9 + info.targetCol)
                     : -1;
     
-    if (!info.candidates.isEmpty()) {
-        QStringList strList;
-        for (int num : info.candidates)
-            strList << QString::number(num);
-        
-        m_mrvStatusText = QString("Cell (%1, %2) ➔ Candidates: [%3]")
-                            .arg(info.targetRow + 1)
-                            .arg(info.targetCol + 1)
-                            .arg(strList.join(", "));
+    // 2. 알고리즘이 실어 보낸 메시지를 그대로 반영
+    if (!info.candidates.isEmpty() && m_statusMessage != info.extraMessage) {
+        m_statusMessage = info.extraMessage;
+        emit statusMessageChanged();
+    }
 
-        emit mrvStatusTextChanged();
-    }    
-
-    // 2. 보드 데이터 비교 및 20여 개 주변 셀 캐시 갱신
+    // 3. 보드 데이터 비교 및 20여 개 주변 셀 캐시 갱신
     std::vector<int> changedIndices;
     for(int r{0}; r < 9; ++r) {
         if (m_board[r] == info.board[r])
@@ -375,7 +368,7 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
         }
     }
 
-    // 3. 보드 숫자, 연필 자국, 타겟 하이라이트를 동시 갱신
+    // 4. 보드 숫자, 연필 자국, 타겟 하이라이트를 동시 갱신
     emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole, IsTargetRole});
 }
 
