@@ -21,7 +21,7 @@ class SudokuBackend : public QAbstractListModel
     Q_PROPERTY(bool isBusy READ isBusy NOTIFY isBusyChanged ) // 작업 중 여부 표시
     Q_PROPERTY(bool isPaused READ isPaused NOTIFY isPausedChanged)
 
-    Q_PROPERTY(QString mrvStatusText READ mrvStatusText NOTIFY mrvStatusTextChanged)
+    Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
 
     QML_ELEMENT // QML에서 직접 사용할 수 있게 등록
 public:
@@ -47,7 +47,7 @@ public:
     SudokuSolver::SolveAlgorithm algorithm() const;
     bool isBusy() const;
     bool isPaused() const;
-    QString mrvStatusText() const;
+    QString statusMessage() const;
 
     void setVisualize(bool v);
     void setDelay(int d);
@@ -74,7 +74,7 @@ signals:
     void isPausedChanged();
     void solveFinished(int status, int elapsedMs);
     void generateFinished(bool success);
-    void mrvStatusTextChanged();
+    void statusMessageChanged();
 
 private slots:
     // 워커 시그널 처리용
@@ -93,7 +93,7 @@ private:
     bool m_isBusy{false}; // 작업 중 상태
     bool m_isPaused{false};
     SudokuSolver::SolveAlgorithm m_algorithm{SudokuSolver::SolveAlgorithm::BackTracking};
-    QString m_mrvStatusText;
+    QString m_statusMessage;
 
     // 스레드 관련
     QPointer<QThread> m_workerThread{nullptr};
@@ -103,6 +103,7 @@ private:
     void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
     void recalculateAllCandidates(); // 전체 후보 캐시 재계산 헬퍼
     void updateCandidateCacheAt(int r, int c); // 특정 셀의 후보 비트셋 캐시 갱신 헬퍼
+    void updatePeerCandidatesAt(int r, int c, std::bitset<81>* updatedMask = nullptr); // 특정 셀과 연관된 20여 개 셀 캐시 증분 갱신
 };
 
 #endif // SUDOKU_BACKEND_H

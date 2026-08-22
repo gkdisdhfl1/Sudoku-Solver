@@ -56,7 +56,7 @@ private:
     QWaitCondition m_pauseCondition;
     std::atomic_bool m_isPaused{false};
 
-    bool processStep(const QVector<QVector<int>>& currentBoard);
+    bool processStep(const StepInfo& info);
 };
 
 #endif // SOLVER_WORKER_H
