@@ -14,7 +14,7 @@ Rectangle {
     required property var candidates // C++ CandidatesRole 수신
     required property bool isTarget // C++ IsTargetRole 수신
     required property SudokuBackend backend
-    required property var grid
+    required property var parentGrid
 
     readonly property int row: Math.floor(index / 9)
     readonly property int col: index % 9
@@ -111,28 +111,28 @@ Rectangle {
         // ==========================================
         Keys.onLeftPressed: event => {
             if (cell.col > 0) {
-                cell.grid.focusCellAt(cell.index - 1);
+                cell.parentGrid.focusCellAt(cell.index - 1);
                 event.accepted = true; // 기본 커서 이동 동작 차단 및 소모
             }
         }
 
         Keys.onRightPressed: event => {
             if (cell.col < 8) {
-                cell.grid.focusCellAt(cell.index + 1);
+                cell.parentGrid.focusCellAt(cell.index + 1);
                 event.accepted = true; // 기본 커서 이동 동작 차단 및 소모
             }
         }
 
         Keys.onUpPressed: event => {
             if (cell.row > 0) {
-                cell.grid.focusCellAt(cell.index - 9);
+                cell.parentGrid.focusCellAt(cell.index - 9);
                 event.accepted = true; // 기본 커서 이동 동작 차단 및 소모
             }
         }
 
         Keys.onDownPressed: event => {
             if (cell.row < 8) {
-                cell.grid.focusCellAt(cell.index + 9);
+                cell.parentGrid.focusCellAt(cell.index + 9);
                 event.accepted = true; // 기본 커서 이동 동작 차단 및 소모
             }
         }

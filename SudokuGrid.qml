@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import SudokuSolver
@@ -26,7 +28,7 @@ GridLayout {
         model: grid.backend
         delegate: SudokuCell {
             backend: grid.backend
-            grid: grid
+            parentGrid: grid
         }
     }
 }

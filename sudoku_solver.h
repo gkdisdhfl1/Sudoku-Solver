@@ -35,6 +35,7 @@ class SudokuSolver
 {
     Q_GADGET
     QML_ELEMENT
+    QML_UNCREATABLE("SudokuSolver is not instantiable from QML")
     
 public:
     enum class SolveAlgorithm {

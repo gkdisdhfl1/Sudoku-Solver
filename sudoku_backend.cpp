@@ -171,6 +171,7 @@ void SudokuBackend::setCell(int cellIndex, int value)
         // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
         QModelIndex modelIdx = index(cellIndex, 0);
         emit dataChanged(modelIdx, modelIdx);
+        // emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole});
 
         // 값이 바뀔 때마다 에러 상태 갱신
         checkErrors();
