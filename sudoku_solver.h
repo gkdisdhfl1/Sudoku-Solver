@@ -34,9 +34,6 @@ using StepCallback = std::function<bool(const StepInfo& info)>;
 class SudokuSolver
 {
     Q_GADGET
-    QML_ELEMENT
-    QML_UNCREATABLE("SudokuSolver is not instantiable from QML")
-    
 public:
     enum class SolveAlgorithm {
         BackTracking,
@@ -73,6 +70,15 @@ private:
     int countSolutions(QVector<QVector<int>>& board, int maxCount, int idx = 0);
 
     static std::mt19937& get_thread_local_generator();
+};
+
+// [Qt 6 공식 QML Enum 네임스페이스 등록 구조체]
+// SudokuSolver 클래스를 건드리지 않고 QML에서 'SudokuSolver.MRV'로 안전하게 등록함
+namespace QmlSudokuSolverNamespace
+{
+    Q_NAMESPACE
+    QML_FOREIGN_NAMESPACE(SudokuSolver)
+    QML_NAMED_ELEMENT(SudokuSolver)
 };
 
 #endif // SUDOKU_SOLVER_H
