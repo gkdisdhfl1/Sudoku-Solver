@@ -34,6 +34,7 @@ using StepCallback = std::function<bool(const StepInfo& info)>;
 class SudokuSolver
 {
     Q_GADGET
+
 public:
     enum class SolveAlgorithm {
         BackTracking,

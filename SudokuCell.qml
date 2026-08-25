@@ -21,6 +21,16 @@ Rectangle {
     readonly property int blockRow: Math.floor(row / 3)
     readonly property int blockCol: Math.floor(col / 3)
 
+    // 자신이 현재 포커스 대상인지 선언적 감지
+    readonly property bool isFocusedCell: parentGrid.focusedIndex === cell.index
+
+    onIsFocusedCellChanged: {
+        if (isFocusedCell) {
+            inputField.forceActiveFocus();
+            inputField.deselect();
+        }
+    }
+
     // 3x3 구역 구분을 위한 배경색 교차 (체커보드 스타일)
     readonly property bool isDarkBlock: (blockRow + blockCol) % 2 !== 0
 
@@ -86,6 +96,13 @@ Rectangle {
         onTextEdited: {
             let val = parseInt(text);
             cell.backend.setCell(cell.index, isNaN(val) ? 0 : val);
+        }
+
+        // 마우스로 셀을 클릭했을 때도 focusedIndex를 즉시 동기화
+        onActiveFocusChanged: {
+            if (activeFocus && cell.parentGrid.focusedIndex !== cell.index) {
+                cell.parentGrid.focusedIndex = cell.index;
+            }
         }
 
         // ==========================================
@@ -157,11 +174,5 @@ Rectangle {
         width: (cell.col === 2 || cell.col === 5) ? 3 : 0 // 3px 두께
         color: "#34495e" // 판 전체와 대비되는 짙은 차콜 색상
         visible: cell.col < 8 // 최우측 바깥 경계는 윈도우 테두리가 있어 제외
-    }
-
-    // 외부에서 포커스 요청 시 텍스트 필드를 활성화하는 헬퍼
-    function focusInput() {
-        inputField.forceActiveFocus();
-        inputField.deselect(); // 드래그 지정(블록)을 강제로 해제
     }
 }
