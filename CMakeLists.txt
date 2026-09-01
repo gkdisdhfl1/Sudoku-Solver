@@ -19,6 +19,12 @@ qt_add_qml_module(appSudokuSolver
     URI SudokuSolver
     QML_FILES
         Main.qml
+        ResultDialog.qml
+        SudokuCell.qml
+        SudokuGrid.qml
+        StepInfoBar.qml
+        VisualizationSettings.qml
+        ControlBar.qml
         SOURCES sudoku_backend.h sudoku_backend.cpp
         SOURCES sudoku_solver.h sudoku_solver.cpp
         SOURCES solver_worker.h solver_worker.cpp
@@ -32,7 +38,7 @@ set_target_properties(appSudokuSolver PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
+    WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>
 )
 
 target_link_libraries(appSudokuSolver
