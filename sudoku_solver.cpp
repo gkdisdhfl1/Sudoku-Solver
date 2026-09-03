@@ -39,6 +39,16 @@ bool SudokuSolver::isValid(const QVector<QVector<int>> &board, int r, int c, int
 
 SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
 {
+    // 초기 보드 자체에 이미 규칙 위반(중복)이 존재하는지 사전 검사
+    for (int r{0}; r < 9; ++r) {
+        for (int c{0}; c < 9; ++c) {
+            int num{board[r][c]};
+            if (num != 0 && !isValid(board, r, c, num, true)) {
+                return SolveResult::Failed; // 이미 모순된 보드는 즉시 실패 반환
+            }
+        }
+    }
+
     switch (algorithm) {
         case SolveAlgorithm::BackTracking:
             return solveBacktracking(board, callback, 0);

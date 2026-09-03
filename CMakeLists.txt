@@ -5,10 +5,11 @@ project(SudokuSolver VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Test)
 
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
+enable_testing()
 
 qt_add_executable(appSudokuSolver
     main.cpp
@@ -18,13 +19,13 @@ qt_add_executable(appSudokuSolver
 qt_add_qml_module(appSudokuSolver
     URI SudokuSolver
     QML_FILES
-        Main.qml
-        ResultDialog.qml
-        SudokuCell.qml
-        SudokuGrid.qml
-        StepInfoBar.qml
-        VisualizationSettings.qml
-        ControlBar.qml
+        qml/Main.qml
+        qml/ResultDialog.qml
+        qml/SudokuCell.qml
+        qml/SudokuGrid.qml
+        qml/StepInfoBar.qml
+        qml/VisualizationSettings.qml
+        qml/ControlBar.qml
         SOURCES sudoku_backend.h sudoku_backend.cpp
         SOURCES sudoku_solver.h sudoku_solver.cpp
         SOURCES solver_worker.h solver_worker.cpp
@@ -44,6 +45,8 @@ set_target_properties(appSudokuSolver PROPERTIES
 target_link_libraries(appSudokuSolver
     PRIVATE Qt6::Quick
 )
+
+add_subdirectory(tests)
 
 include(GNUInstallDirs)
 install(TARGETS appSudokuSolver
