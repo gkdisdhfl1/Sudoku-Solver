@@ -71,7 +71,7 @@ void TestSudokuBackend::testErrorDetectionAndSignals()
 
     // 2. 같은 행인 (0, 3)에도 5를 넣음 -> 중복 에러 발생
     backend.setCell(3, 5);
-    QCOMPARE(backend.hasErrors(), false);
+    QCOMPARE(backend.hasErrors(), true);
     QCOMPARE(errorSignalSpy.count(), 1); // hasErrorsChanged 시그널 방출 확인
 
     // 두 셀 모두 ErrorRole이 true인지 검증
