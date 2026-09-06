@@ -1,7 +1,4 @@
 function(qtest_register_tests target source_file suite_name)
-    # 필요하면 유지. 개별 항목과 중복 실행됨.
-    add_test(NAME "${suite_name}.All"
-             COMMAND $<TARGET_FILE:${target}>)
     file(STRINGS "${source_file}" test_lines
          REGEX "void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
     foreach(line IN LISTS test_lines)
@@ -13,6 +10,8 @@ function(qtest_register_tests target source_file suite_name)
         endif()
     endforeach()
 endfunction()
+
+find_package(Qt6 REQUIRED COMPONENTS Test)
 
 # ==============================================================================
 # 1. SudokuSolver 핵심 알고리즘 단위 테스트
@@ -26,7 +25,7 @@ qt_add_executable(tst_sudoku_solver
 
 target_include_directories(tst_sudoku_solver PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(tst_sudoku_solver PRIVATE Qt6::Test Qt6::Core)
-qtest_register_tests(tst_sudoku_solver "${CMAKE_CURRENT_SOURCE_DIR}/tst_sudoku_solver.cpp" SudokuSolver)
+qtest_register_tests(tst_sudoku_solver tst_sudoku_solver.cpp SudokuSolver)
 
 # ==============================================================================
 # 2. SudokuBackend 모델 및 캐시 통합 테스트
@@ -43,4 +42,4 @@ qt_add_executable(tst_sudoku_backend
 )
 target_include_directories(tst_sudoku_backend PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(tst_sudoku_backend PRIVATE Qt6::Test Qt6::Quick)
-qtest_register_tests(tst_sudoku_backend "${CMAKE_CURRENT_SOURCE_DIR}/tst_sudoku_backend.cpp" SudokuBackend)
+qtest_register_tests(tst_sudoku_backend tst_sudoku_backend.cpp SudokuBackend)

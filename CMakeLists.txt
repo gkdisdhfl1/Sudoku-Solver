@@ -5,11 +5,10 @@ project(SudokuSolver VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Test)
+find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
-enable_testing()
 
 qt_add_executable(appSudokuSolver
     main.cpp
@@ -46,7 +45,11 @@ target_link_libraries(appSudokuSolver
     PRIVATE Qt6::Quick
 )
 
-add_subdirectory(tests)
+# CMake 표준 테스트 모듈 (BUILD_TESTING 옵션을 자동 생성하며 기본값은 ON)
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS appSudokuSolver

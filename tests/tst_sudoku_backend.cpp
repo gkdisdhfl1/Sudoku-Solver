@@ -100,5 +100,5 @@ void TestSudokuBackend::testClearBoard()
     }
 }
 
-QTEST_MAIN(TestSudokuBackend)
+QTEST_GUILESS_MAIN(TestSudokuBackend)
 #include "tst_sudoku_backend.moc"
