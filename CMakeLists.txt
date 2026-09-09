@@ -18,13 +18,13 @@ qt_add_executable(appSudokuSolver
 qt_add_qml_module(appSudokuSolver
     URI SudokuSolver
     QML_FILES
-        Main.qml
-        ResultDialog.qml
-        SudokuCell.qml
-        SudokuGrid.qml
-        StepInfoBar.qml
-        VisualizationSettings.qml
-        ControlBar.qml
+        qml/Main.qml
+        qml/ResultDialog.qml
+        qml/SudokuCell.qml
+        qml/SudokuGrid.qml
+        qml/StepInfoBar.qml
+        qml/VisualizationSettings.qml
+        qml/ControlBar.qml
         SOURCES sudoku_backend.h sudoku_backend.cpp
         SOURCES sudoku_solver.h sudoku_solver.cpp
         SOURCES solver_worker.h solver_worker.cpp
@@ -44,6 +44,12 @@ set_target_properties(appSudokuSolver PROPERTIES
 target_link_libraries(appSudokuSolver
     PRIVATE Qt6::Quick
 )
+
+# CMake 표준 테스트 모듈 (BUILD_TESTING 옵션을 자동 생성하며 기본값은 ON)
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS appSudokuSolver
