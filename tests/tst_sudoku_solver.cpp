@@ -1,6 +1,4 @@
 #include <QtTest>
-#include <qcontainerfwd.h>
-#include <qtestcase.h>
 #include "sudoku_solver.h"
 
 class TestSudokuSolver : public QObject
@@ -162,5 +160,5 @@ void TestSudokuSolver::testGenerateAndUniqueSolution()
     }
 }
 
-QTEST_MAIN(TestSudokuSolver)
+QTEST_GUILESS_MAIN(TestSudokuSolver)
 #include "tst_sudoku_solver.moc"

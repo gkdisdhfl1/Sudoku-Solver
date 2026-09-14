@@ -1,7 +1,5 @@
 #include <QtTest>
 #include <QSignalSpy>
-#include <qtest.h>
-#include <qtestcase.h>
 #include "sudoku_backend.h"
 
 class TestSudokuBackend : public QObject

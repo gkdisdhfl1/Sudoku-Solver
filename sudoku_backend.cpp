@@ -2,12 +2,8 @@
 
 #include "sudoku_solver.h"
 
-#include "sudoku_constants.h"
-
 #include <QCoreApplication>
 #include <QThread>
-
-using namespace SudokuConstants;
 
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}

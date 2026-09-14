@@ -9,6 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
+qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(appSudokuSolver
     main.cpp

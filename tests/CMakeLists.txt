@@ -1,12 +1,19 @@
 function(qtest_register_tests target source_file suite_name)
-    file(STRINGS "${source_file}" test_lines
-         REGEX "void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}" test_lines
+        REGEX "^[ \t]*void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
     foreach(line IN LISTS test_lines)
         string(REGEX MATCH "test[A-Za-z0-9_]+" test_name "${line}")
         # testFoo_data()는 Qt Test 데이터 공급 함수이므로 제외
         if(test_name AND NOT test_name MATCHES "_data$")
-            add_test(NAME "${suite_name}.${test_name}"
-                     COMMAND $<TARGET_FILE:${target}> "${test_name}" -v2)
+            set(test_id "${suite_name}.${test_name}")
+            add_test(NAME "${test_id}"
+                COMMAND $<TARGET_FILE:${target}> "${test_name}" -v2)
+            # Windows에서 Ctest 단독 실행 시 Qt DLL 경로를 자동으로 PATH 맨 앞에 추가
+            if(WIN32)
+                set_tests_properties("${test_id}" PROPERTIES
+                    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"                
+                )
+            endif()
         endif()
     endforeach()
 endfunction()

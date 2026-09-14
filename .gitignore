@@ -85,3 +85,4 @@ CMakeLists.txt.user*
 .qtcreator/
 .vscode/
 /tests/build*/
+.agents/
