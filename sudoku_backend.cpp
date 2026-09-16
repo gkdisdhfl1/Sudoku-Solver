@@ -4,6 +4,9 @@
 
 #include <QCoreApplication>
 #include <QThread>
+#include <bitset>
+#include <cstddef>
+#include <qabstractitemmodel.h>
 
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}
@@ -162,11 +165,21 @@ void SudokuBackend::setCell(int cellIndex, int value)
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
 
-        updatePeerCandidatesAt(r, c);
+        // 1. 모델 영향을 받는 피어 셀(최대 21개)을 bitset 마스크로 추적
+        std::bitset<81> affectedMask;
+        updatePeerCandidatesAt(r, c, &affectedMask);
 
-        // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
-        QModelIndex modelIdx = index(cellIndex, 0);
-        emit dataChanged(modelIdx, modelIdx);
+        // 2. 자기 자신: 값과 후보 둘 다 갱신
+        QModelIndex selfIdx = index(cellIndex, 0);
+        emit dataChanged(selfIdx, selfIdx, {ValueRole, CandidatesRole});
+
+        // 3. 20개 피어 셀: 오직 CandidatesRole만 정밀 타겟팅 방출
+        for (size_t idx{0}; idx < 81; ++idx) {
+            if (idx != static_cast<size_t>(cellIndex) && affectedMask.test(idx)) {
+                QModelIndex peerIdx = index(static_cast<int>(idx), 0);
+                emit dataChanged(peerIdx, peerIdx, {CandidatesRole});
+            }
+        }
 
         // 값이 바뀔 때마다 에러 상태 갱신
         checkErrors();
@@ -182,9 +195,11 @@ void SudokuBackend::clear()
     for(int i{0}; i < 9; ++i) {
         m_board[i].fill(0);
     }
+    
+    // 뷰가 데이터를 읽기(Fetch) 전에 후보 캐시를 먼저 완벽히 초기화
+    recalculateAllCandidates();
     endResetModel();
 
-    recalculateAllCandidates();
     // 클리어 시 에러 초기화
     checkErrors();
 }
@@ -446,9 +461,6 @@ void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* update
 {
     int boxStartR{r - r % 3};
     int boxStartC{c - c % 3};
-
-    // 외부에서 마스크를 안 주면 내부에서 로컬 마스크 생성
-    std::bitset<81> localMask;
 
     // 이미 방문한 셀은 건너뛰고 최초 1회만 계산
     auto updateOnce = [this, updatedMask](int row, int col) {
