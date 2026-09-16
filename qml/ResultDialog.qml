@@ -15,6 +15,7 @@ Dialog {
     modal: true
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    padding: 16
 
     background: Rectangle {
         color: "#ffffff"
@@ -28,7 +29,6 @@ Dialog {
     ColumnLayout {
         width: parent.width
         spacing: 20
-        anchors.margins: 10
 
         // 1. 헤더 (성공/실패 비주얼)
         RowLayout {
@@ -48,7 +48,7 @@ Dialog {
         // 구분선
         Rectangle {
             Layout.fillWidth: true
-            height: 1
+            Layout.preferredHeight: 1
             color: "#f1f5f9"
         }
 
@@ -100,7 +100,7 @@ Dialog {
         // 구분선
         Rectangle {
             Layout.fillWidth: true
-            height: 1
+            Layout.preferredHeight: 1
             color: "#f1f5f9"
         }
 
@@ -108,7 +108,7 @@ Dialog {
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 120
-            height: 36
+            Layout.preferredHeight: 36
             color: mouseArea.pressed ? "#2c3e50" : "#34495e"
             radius: 8
 

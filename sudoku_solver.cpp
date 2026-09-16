@@ -39,6 +39,19 @@ bool SudokuSolver::isValid(const QVector<QVector<int>> &board, int r, int c, int
 
 SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
 {
+    // 보드 규격(9x9), 숫자 범위(0~9) 및 초기 중복 검사
+    if (board.size() != 9) return SolveResult::Failed;
+    for (int r{0}; r < 9; ++r) {
+        if (board[r].size() != 9) return SolveResult::Failed;
+        for (int c{0}; c < 9; ++c) {
+            int num{board[r][c]};
+            // 0~9 범위를 벗어났거나, 이미 규칙을 위반한 중복 숫자가 존재하면 즉시 실패 반환
+            if (num < 0 || num > 9 || (num != 0 && !isValid(board, r, c, num, true))) {
+                return SolveResult::Failed; // 이미 모순된 보드는 즉시 실패 반환
+            }
+        }
+    }
+
     switch (algorithm) {
         case SolveAlgorithm::BackTracking:
             return solveBacktracking(board, callback, 0);
