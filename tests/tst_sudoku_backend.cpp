@@ -12,6 +12,8 @@ private slots:
     void testSetCellAndPeerCandidateCache();
     void testErrorDetectionAndSignals();
     void testClearBoard();
+    void testClearResetsCandidatesImmediately();
+    void testSetCellEmitsDataChangedForPeers();
 };
 
 void TestSudokuBackend::initTestCase()
@@ -96,6 +98,40 @@ void TestSudokuBackend::testClearBoard()
     for (int i{0}; i < 81; ++i) {
         QCOMPARE(backend.data(backend.index(i, 0), SudokuBackend::ValueRole).toInt(), 0);
     }
+}
+
+void TestSudokuBackend::testClearResetsCandidatesImmediately() 
+{
+    SudokuBackend backend;
+
+    // 일부 셀에 숫자를 채워 후보를 수축시킴
+    backend.setCell(0, 5);
+    backend.setCell(1, 3);
+
+    // 1회 Clear 호출
+    backend.clear();
+
+    // 1회 클리어 직후 81개 셀의 후보가 9개(1~9 전체)로 즉시 보구되었는지 검증
+    for (int i{0}; i < 81; ++i) {
+        QVariantList cands = backend.data(backend.index(i, 0), SudokuBackend::CandidatesRole).toList();
+        QCOMPARE(cands.size(), 9);
+    }
+}
+
+void TestSudokuBackend::testSetCellEmitsDataChangedForPeers()
+{
+    SudokuBackend backend;
+    QSignalSpy dataChangedSpy(&backend, &SudokuBackend::dataChanged);
+
+    // (0, 0)에 5 입력
+    backend.setCell(0, 5);
+
+    // 적어도 자기 자신 + 피어 셀들(총 21회)만큼 dataChanged가 방출되었는지 검증
+    QVERIFY(dataChangedSpy.count() >= 21);
+
+    // 같은 행인 (0, 1) 인덱스 1번 셀의 후보에서 5가 빠졌는지 검증
+    QVariantList peerCands = backend.data(backend.index(1, 0), SudokuBackend::CandidatesRole).toList();
+    QVERIFY(!peerCands.contains(5));
 }
 
 QTEST_GUILESS_MAIN(TestSudokuBackend)
