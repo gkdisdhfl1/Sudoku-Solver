@@ -12,6 +12,9 @@ private slots:
     void testSetCellAndPeerCandidateCache();
     void testErrorDetectionAndSignals();
     void testClearBoard();
+    void testClearResetsCandidatesImmediately();
+    void testClearResetsErrorsAtomically();
+    void testSetCellEmitsDataChangedForPeers();
 };
 
 void TestSudokuBackend::initTestCase()
@@ -96,6 +99,81 @@ void TestSudokuBackend::testClearBoard()
     for (int i{0}; i < 81; ++i) {
         QCOMPARE(backend.data(backend.index(i, 0), SudokuBackend::ValueRole).toInt(), 0);
     }
+}
+
+void TestSudokuBackend::testClearResetsCandidatesImmediately() 
+{
+    SudokuBackend backend;
+
+    // 일부 셀에 숫자를 채워 후보를 수축시킴
+    backend.setCell(0, 5);
+    backend.setCell(1, 3);
+
+    // 1회 Clear 호출
+    backend.clear();
+
+    // 1회 클리어 직후 81개 셀의 후보가 9개(1~9 전체)로 즉시 복구되었는지 검증
+    for (int i{0}; i < 81; ++i) {
+        QVariantList cands = backend.data(backend.index(i, 0), SudokuBackend::CandidatesRole).toList();
+        QCOMPARE(cands.size(), 9);
+    }
+}
+
+void TestSudokuBackend::testClearResetsErrorsAtomically()
+{
+    SudokuBackend backend;
+
+    // 1. 일부러 중복 숫자를 넣어 에러 상태를 만듦
+    backend.setCell(0, 5);
+    backend.setCell(1, 5);
+    QCOMPARE(backend.hasErrors(), true);
+
+    QSignalSpy dataChangedSpy(&backend, &SudokuBackend::dataChanged);
+
+    // 2. QML 뷰가 데이터를 일어가는 그 찰나에 ErrorRole은 이미 false로 깨끗하게 리셋되어 있는지 스냅샷 검증
+    bool errorFoundDuringReset{false};
+    QObject::connect(&backend, &QAbstractItemModel::modelReset, [&]() {
+        for (int i{0}; i < 81; ++i) {
+            if (backend.data(backend.index(i, 0), SudokuBackend::ErrorRole).toBool()) {
+                errorFoundDuringReset = true;
+            }
+        }
+    });
+
+    // 3. Clear() 실행
+    backend.clear();
+
+    // 4. 뷰가 읽는 순간에 이전 에러가 1개도 남아있지 않았어야 함
+    QVERIFY(!errorFoundDuringReset);
+    QCOMPARE(backend.hasErrors(), false);
+
+    // 리셋 완료 후 뒤늦게 발생하는 불필요한 dataChanged({ErrorRole}) 시그널이 0회여야 함
+    QCOMPARE(dataChangedSpy.count(), 0);
+}
+
+void TestSudokuBackend::testSetCellEmitsDataChangedForPeers()
+{
+    SudokuBackend backend;
+    QSignalSpy dataChangedSpy(&backend, &SudokuBackend::dataChanged);
+
+    // 1. (0, 0)에 5 입력 -> 피어 셀 후보에서 5 제거 검증
+    backend.setCell(0, 5);
+
+    // 적어도 자기 자신 + 피어 셀들(총 21회)만큼 dataChanged가 방출되었는지 검증
+    QVERIFY(dataChangedSpy.count() >= 21);
+
+    // 같은 행인 (0, 1) 인덱스 1번 셀의 후보에서 5가 빠졌는지 검증
+    QVariantList peerCands = backend.data(backend.index(1, 0), SudokuBackend::CandidatesRole).toList();
+    QVERIFY(!peerCands.contains(5));
+
+    // 2. (0, 0)을 0으로 초기화 -> 피어 셀 후보에 5 복원 검증
+    dataChangedSpy.clear();
+    backend.setCell(0, 0);
+    QVERIFY(dataChangedSpy.count() >= 21);
+
+    peerCands = backend.data(backend.index(1, 0), SudokuBackend::CandidatesRole).toList();
+    QVERIFY(peerCands.contains(5));
+    QCOMPARE(peerCands.size(), 9);
 }
 
 QTEST_GUILESS_MAIN(TestSudokuBackend)

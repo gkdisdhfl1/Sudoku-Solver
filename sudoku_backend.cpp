@@ -4,6 +4,8 @@
 
 #include <QCoreApplication>
 #include <QThread>
+#include <bitset>
+#include <cstddef>
 
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}
@@ -162,11 +164,23 @@ void SudokuBackend::setCell(int cellIndex, int value)
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
 
-        updatePeerCandidatesAt(r, c);
+        // 1. 모델 영향을 받는 피어 셀(최대 21개)을 bitset 마스크로 추적
+        std::bitset<81> affectedMask;
+        updatePeerCandidatesAt(r, c, &affectedMask);
 
-        // 표준 index() API로 인덱스를 생성하고, 역할 필터 없이 확실하게 dataChanged 발행
-        QModelIndex modelIdx = index(cellIndex, 0);
-        emit dataChanged(modelIdx, modelIdx);
+        // 2. 자기 자신: 값과 후보 둘 다 갱신
+        QModelIndex selfIdx = index(cellIndex, 0);
+        emit dataChanged(selfIdx, selfIdx, {ValueRole, CandidatesRole});
+
+        // 3. 20개 피어 셀 중 빈 칸(m_board == 0)인 셀에 대해서만 CandidatesRole만 정밀 타겟팅 방출
+        for (int idx{0}; idx < 81; ++idx) {
+            if (idx != cellIndex && affectedMask.test(idx)) {
+                if (m_board[idx / 9][idx % 9] == 0) {
+                    QModelIndex peerIdx = index(idx, 0);
+                    emit dataChanged(peerIdx, peerIdx, {CandidatesRole});
+                }
+            }
+        }
 
         // 값이 바뀔 때마다 에러 상태 갱신
         checkErrors();
@@ -182,11 +196,19 @@ void SudokuBackend::clear()
     for(int i{0}; i < 9; ++i) {
         m_board[i].fill(0);
     }
+    
+    // 뷰가 데이터를 읽기(Fetch) 전에 후보 캐시를 먼저 완벽히 초기화
+    recalculateAllCandidates();
+
+    // 뷰가 읽기 전에 에러 상태도 미리 초기화
+    bool wasErrors = m_errorCells.any();
+    m_errorCells.reset();
     endResetModel();
 
-    recalculateAllCandidates();
-    // 클리어 시 에러 초기화
-    checkErrors();
+    // 에러 상태가 변경되었음을 알리는 프로퍼티 신호 방출
+    if (wasErrors) {
+        emit hasErrorsChanged();
+    }
 }
 
 bool SudokuBackend::isValidBoard() const
@@ -447,15 +469,15 @@ void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* update
     int boxStartR{r - r % 3};
     int boxStartC{c - c % 3};
 
-    // 외부에서 마스크를 안 주면 내부에서 로컬 마스크 생성
+    // 외부에서 마스크가 주어지지 않은 경우 내부 로컬 마스크를 바인딩하여 중복 방문 차단
     std::bitset<81> localMask;
+    std::bitset<81>& mask = updatedMask ? *updatedMask : localMask;
 
     // 이미 방문한 셀은 건너뛰고 최초 1회만 계산
-    auto updateOnce = [this, updatedMask](int row, int col) {
+    auto updateOnce = [this, &mask](int row, int col) {
         int idx{row * 9 + col};
-        if (!updatedMask || !updatedMask->test(idx)) {
-            if (updatedMask)
-                updatedMask->set(idx);
+        if (!mask.test(idx)) {
+            mask.set(idx);
             updateCandidateCacheAt(row, col);
         }
     };
