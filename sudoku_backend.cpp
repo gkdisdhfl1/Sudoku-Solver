@@ -6,7 +6,6 @@
 #include <QThread>
 #include <bitset>
 #include <cstddef>
-#include <qabstractitemmodel.h>
 
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}
@@ -173,11 +172,13 @@ void SudokuBackend::setCell(int cellIndex, int value)
         QModelIndex selfIdx = index(cellIndex, 0);
         emit dataChanged(selfIdx, selfIdx, {ValueRole, CandidatesRole});
 
-        // 3. 20개 피어 셀: 오직 CandidatesRole만 정밀 타겟팅 방출
-        for (size_t idx{0}; idx < 81; ++idx) {
-            if (idx != static_cast<size_t>(cellIndex) && affectedMask.test(idx)) {
-                QModelIndex peerIdx = index(static_cast<int>(idx), 0);
-                emit dataChanged(peerIdx, peerIdx, {CandidatesRole});
+        // 3. 20개 피어 셀 중 빈 칸(m_board == 0)인 셀에 대해서만 CandidatesRole만 정밀 타겟팅 방출
+        for (int idx{0}; idx < 81; ++idx) {
+            if (idx != cellIndex && affectedMask.test(idx)) {
+                if (m_board[idx / 9][idx % 9] == 0) {
+                    QModelIndex peerIdx = index(idx, 0);
+                    emit dataChanged(peerIdx, peerIdx, {CandidatesRole});
+                }
             }
         }
 
@@ -198,10 +199,16 @@ void SudokuBackend::clear()
     
     // 뷰가 데이터를 읽기(Fetch) 전에 후보 캐시를 먼저 완벽히 초기화
     recalculateAllCandidates();
+
+    // 뷰가 읽기 전에 에러 상태도 미리 초기화
+    bool wasErrors = m_errorCells.any();
+    m_errorCells.reset();
     endResetModel();
 
-    // 클리어 시 에러 초기화
-    checkErrors();
+    // 에러 상태가 변경되었음을 알리는 프로퍼티 신호 방출
+    if (wasErrors) {
+        emit hasErrorsChanged();
+    }
 }
 
 bool SudokuBackend::isValidBoard() const
@@ -462,12 +469,15 @@ void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* update
     int boxStartR{r - r % 3};
     int boxStartC{c - c % 3};
 
+    // 외부에서 마스크가 주어지지 않은 경우 내부 로컬 마스크를 바인딩하여 중복 방문 차단
+    std::bitset<81> localMask;
+    std::bitset<81>& mask = updatedMask ? *updatedMask : localMask;
+
     // 이미 방문한 셀은 건너뛰고 최초 1회만 계산
-    auto updateOnce = [this, updatedMask](int row, int col) {
+    auto updateOnce = [this, &mask](int row, int col) {
         int idx{row * 9 + col};
-        if (!updatedMask || !updatedMask->test(idx)) {
-            if (updatedMask)
-                updatedMask->set(idx);
+        if (!mask.test(idx)) {
+            mask.set(idx);
             updateCandidateCacheAt(row, col);
         }
     };
