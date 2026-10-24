@@ -27,6 +27,7 @@ GridLayout {
 
     Repeater {
         id: cellRepeater
+        objectName: "cellRepeater"
         model: grid.backend
         delegate: SudokuCell {
             backend: grid.backend

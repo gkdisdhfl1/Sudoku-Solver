@@ -1,3 +1,5 @@
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 function(qtest_register_tests target source_file suite_name)
     file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}" test_lines
         REGEX "^[ \t]*void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
@@ -50,3 +52,35 @@ qt_add_executable(tst_sudoku_backend
 target_include_directories(tst_sudoku_backend PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(tst_sudoku_backend PRIVATE Qt6::Test Qt6::Quick)
 qtest_register_tests(tst_sudoku_backend tst_sudoku_backend.cpp SudokuBackend)
+
+# ==============================================================================
+# 3. Sudoku GUI E2E 상호작용 테스트 (Semantic Action DSL)
+# ==============================================================================
+qt_add_executable(tst_sudoku_gui
+    tst_sudoku_gui.cpp
+    sudoku_driver.h
+    ${CMAKE_SOURCE_DIR}/sudoku_backend.cpp
+    ${CMAKE_SOURCE_DIR}/sudoku_backend.h
+    ${CMAKE_SOURCE_DIR}/sudoku_solver.cpp
+    ${CMAKE_SOURCE_DIR}/sudoku_solver.h
+    ${CMAKE_SOURCE_DIR}/solver_worker.cpp
+    ${CMAKE_SOURCE_DIR}/solver_worker.h
+    ${CMAKE_SOURCE_DIR}/sudoku_constants.h
+    # QML 모듈 리소스를 테스트 실행 파일에도 임베딩
+    ${CMAKE_BINARY_DIR}/.qt/rcc/qrc_appSudokuSolver_raw_qml_0.cpp
+    ${CMAKE_BINARY_DIR}/.qt/rcc/qrc_appSudokuSolver_raw_qml_0_extra_qmldirs.cpp
+    ${CMAKE_BINARY_DIR}/.qt/rcc/qrc_qmake_SudokuSolver.cpp
+    # SudokuBackend QML 타입 등록 코드 링크
+    ${CMAKE_BINARY_DIR}/appsudokusolver_qmltyperegistrations.cpp
+)
+target_compile_definitions(tst_sudoku_gui PRIVATE
+    TEST_QML_IMPORT_DIR="${CMAKE_BINARY_DIR}"
+)
+target_include_directories(tst_sudoku_gui PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(tst_sudoku_gui PRIVATE Qt6::Test Qt6::Quick Qt6::Qml)
+qtest_register_tests(tst_sudoku_gui tst_sudoku_gui.cpp SudokuGui)
+
+# 오프스크린 QPA 강제
+set_tests_properties(SudokuGui.testCellClickAndTypeOverwrite SudokuGui.testArrowKeyNavigation PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
