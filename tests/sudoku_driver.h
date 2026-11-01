@@ -8,29 +8,58 @@
 
 class SudokuDriver;
 
+namespace sudoku_test {
+    // objectName 기반 조회 (휴리스틱 fallback 제거), 매 호출마다 현재 델리게이트를 반환
+    inline QQuickItem* findCellItem(QQuickWindow* window, int index) {
+        if (!window || index < 0 || index >= 81)
+            return nullptr;
+
+        auto* grid = window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));
+        auto* repeater = grid ? grid->findChild<QQuickItem*>(QStringLiteral("cellRepeater")) : nullptr;
+        if (!repeater)
+            return nullptr;
+
+        QQuickItem* cell = nullptr;
+        QMetaObject::invokeMethod(repeater, "itemAt", Qt::DirectConnection, Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, index));
+
+        return cell;
+    }
+} // namespace sudoku_test
+
 // ==============================================================================
 // CellDriver: 특정 셀에 바인딩된 Fluent Action Chaining Class
 // ==============================================================================
 class CellDriver {
 public:
-   CellDriver(SudokuDriver& parent, QQuickWindow* window, QQuickItem* cellItem, int index)
-            : m_parent(parent), m_window(window), m_cellItem(cellItem), m_index(index) {}
+   CellDriver(QQuickWindow* window, int index) : m_window(window), m_index(index) {}
+
+    // 셀의 정체성은 m_index. 포인터를 캐시하지 않고 매번 조회 -> 모델 리셋 이후에도 유효
+    // 반환값을 변수에 저장하지 말 것 (clear() 등으로 델리게이트가 재생성되면 무효화됨).
+    // 셀을 찾지 못하면 실패로 기록한다. QTest::setThrowOnFail(true)가 켜져 있으면
+    // 예외로 테스트 함수가 즉시 중단되며, 그렇지 않으면 nullptr을 반환한다.
+    QQuickItem* item() const {
+        QQuickItem* it = sudoku_test::findCellItem(m_window, m_index);
+        // QVERIFY는 'return';으로 확장되므로 void 람다로 감쌈
+        [&] { QVERIFY2(it, qPrintable(QStringLiteral("Cell %1 not found in QML tree").arg(m_index))); }();
+        return it;
+    }
 
     // 1. 마우스 클릭 (동적 중심 좌표 계산)
     CellDriver& click() {
-        if (m_cellItem && m_window) {
-            // 창 크기나 마진이 바뀌어도 안전한 중심 좌표 계산
-            QPointF localCenter(m_cellItem->width() / 2.0, m_cellItem->height() / 2.0);
-            QPointF scenePos = m_cellItem->mapToScene(localCenter);
+        if (QQuickItem* it = item()) {
+            QPointF localCenter(it->width() / 2.0, it->height() / 2.0);
+            QPointF scenePos = it->mapToScene(localCenter);
             QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, scenePos.toPoint());
-            QTest::qWait(20); // 이벤트 루프 처리 대기
+            QTest::qWait(20);
         }
         return *this;
     }
 
-    // 2. 키보드 숫자 문자열 입력 (QTest::keyClicks)
+    // 2. 키보드 숫자 문자열 입력
+    // 주의: 키는 윈도우로 전달되므로 현재 포커스된 위치에 입력된다
+    // item() 호출은 셀 존재 여부 확인용
     CellDriver& type(const QString& text) {
-        if (m_window) {
+        if (item() && m_window) {
             for (const QChar& ch : text) {
                 QTest::keyClick(m_window, ch.toLatin1());
                 QTest::qWait(10);
@@ -40,9 +69,9 @@ public:
         return *this;
     }
 
-    // 3. 단일 키 입력 (방향키, Backsapce, Delete 등) 
+    // 3. 단일 키 입력 (방향키, Backsapce, Delete 등). 포커스 된 위치 기준
     CellDriver& press(Qt::Key key) {
-        if (m_window) {
+        if (item() && m_window) {
             QTest::keyClick(m_window, key);
             QTest::qWait(20);
         }
@@ -51,29 +80,26 @@ public:
 
     // 4. 셀 상태 검증 헬퍼 (Assertions)
     int value() const {
-        return m_cellItem ? m_cellItem->property("value").toInt() : -1;
+        QQuickItem* it = item();
+        return it ? it->property("value").toInt() : -1;
     }
 
     bool isError() const {
-        return m_cellItem ? m_cellItem->property("isError").toBool() : false;
+        QQuickItem* it = item();
+        return it ? it->property("isError").toBool() : false;
     }
 
     bool isFocused() const {
-        if (!m_cellItem) return false;
+        QQuickItem* it = item();
+
         // SudokuCell 내부의 iputField가 실제 키보드 포커스를 쥐고 있는지 검증
-        QQuickItem* input = m_cellItem->findChild<QQuickItem*>("inputField");
-        if (input) {
-            return input->property("activeFocus").toBool();
-        }
-        return m_cellItem->property("isFocusedCell").toBool();
+        QQuickItem* input = it ? it->findChild<QQuickItem*>(QStringLiteral("inputField")) : nullptr;
+        return input && input->hasActiveFocus();
     }
 
     QVariantList candidates() const {
-        return m_cellItem ? m_cellItem->property("candidates").toList() : QVariantList();
-    }
-
-    QQuickItem* item() const {
-        return m_cellItem;
+        QQuickItem* it = item();
+        return it ? it->property("candidates").toList() : QVariantList();
     }
 
     int index() const {
@@ -81,13 +107,11 @@ public:
     }
 
     // 체이닝 연계: 다른 셀로 즉시 전환
-    CellDriver cell(int row, int col);
-    CellDriver cell(int index);
+    CellDriver cell(int row, int col) const;
+    CellDriver cell(int index) const;
 
 private:
-    SudokuDriver& m_parent;
-    QQuickWindow* m_window;
-    QQuickItem* m_cellItem;
+    QPointer<QQuickWindow> m_window; // 창은 테스트 케이스 동안 정체성이 바뀌지 않으므로 이것만 유지
     int m_index;
 };
 
@@ -97,20 +121,19 @@ private:
 class SudokuDriver {
 public:
     explicit SudokuDriver(QQuickWindow* window) : m_window(window) {}
-
+    
     static SudokuDriver on(QQuickWindow* window) {
         return SudokuDriver(window);
     }
 
     // 특정 셀 획득 (row: 0~8, col: 0~8)
-    CellDriver cell(int row, int col) {
-        return cell(row * 9 + col);
+    CellDriver cell(int row, int col) const {
+        return {m_window, row * 9 + col};
     }
 
     // 특정 셀 획득 (1차원 index: 0~80)
-    CellDriver cell(int index) {
-        QQuickItem* cellItem = findCellItem(index);
-        return CellDriver(*this, m_window, cellItem, index);
+    CellDriver cell(int index) const {
+        return {m_window, index}; // 생성 시점에는 조회하지 않음
     }
 
     // 전역 키 입력
@@ -128,58 +151,15 @@ public:
         return *this;
     }
 
-    // QML 트리에서 특정 인덱스의 SudokuCell 탐색
-    QQuickItem* findCellItem(int index) {
-        if (!m_window || index < 0 || index >= 81) return nullptr;
-
-        // 1. sudokuGrid 아이템 탐색
-        QQuickItem* grid = m_window->findChild<QQuickItem*>("sudokuGrid");
-        if (!grid) {
-            // objectName이 없을 경우 focusedIndex 속성을 보유한 그리드를 순회 탐색
-            const auto items = m_window->contentItem()->findChildren<QQuickItem*>();
-            for (auto* item : items) {
-                if (item->property("focusedIndex").isValid()) {
-                    grid = item;
-                    break;
-                }
-            }
-        }
-
-        // 2. cellRepeater를 통해 해당 인덱스의 셀 아이템 획득
-        if (grid) {
-            QQuickItem* repeater = grid->findChild<QQuickItem*>("cellRepeater");
-            if (!repeater) {
-                // 이름이 지정되지 않은 경우 자식 Repeater 탐색
-                const auto children = grid->findChildren<QQuickItem*>();
-                for (auto* child : children) {
-                    if (child->property("model").isValid()) {
-                        repeater = child;
-                        break;
-                    }
-                }
-            }
-
-            if (repeater) {
-                QQuickItem* cell = nullptr;
-                QMetaObject::invokeMethod(repeater, "itemAt",
-                    Qt::DirectConnection,
-                    Q_RETURN_ARG(QQuickItem*, cell),
-                    Q_ARG(int, index));
-                return cell;
-            }
-        }
-        return nullptr;
-    }
-
 private:
     QQuickWindow* m_window;
 };
 
 // CellDriver 인라인 구현
-inline CellDriver CellDriver::cell(int row, int col) {
-    return m_parent.cell(row, col);
+inline CellDriver CellDriver::cell(int row, int col) const{
+    return {m_window, row * 9 + col};
 }
 
-inline CellDriver CellDriver::cell(int index) {
-    return m_parent.cell(index);
+inline CellDriver CellDriver::cell(int index) const{
+    return {m_window, index};
 }

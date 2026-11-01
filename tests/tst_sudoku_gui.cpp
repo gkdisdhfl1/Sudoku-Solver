@@ -3,7 +3,6 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include "sudoku_driver.h"
-#include "sudoku_backend.h"
 
 class TestSudokuGui : public QObject
 {
@@ -27,6 +26,7 @@ private:
 
 void TestSudokuGui::initTestCase()
 {
+    QTest::setThrowOnFail(true); // 드라이버 헬퍼의 QVERIFY 실패 시 테스트 함수 즉시 중단
     m_engine = std::make_unique<QQmlApplicationEngine>();
 
     // 빌드 디렉토리에 생성된 SudokuSolver QML 모듈 경로 추가
