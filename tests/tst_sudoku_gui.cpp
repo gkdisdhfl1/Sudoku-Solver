@@ -3,6 +3,7 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include "sudoku_driver.h"
+#include "sudoku_backend.h"
 
 class TestSudokuGui : public QObject
 {
@@ -19,10 +20,20 @@ private slots:
     // 2. 방향키 네비게이션 및 경계 조건 검증
     void testArrowKeyNavigation();
 
+    // 3. 모델 리셋(clear) 후에도 이전에 얻은 CellDriver가 새 델리게이트를 가리키는지 검증
+    void testCellDriverSurvivesModelReset();
+
 private:
+    SudokuBackend* findBackend() const;
     std::unique_ptr<QQmlApplicationEngine> m_engine;
     QQuickWindow* m_window{nullptr};
 };
+
+SudokuBackend* TestSudokuGui::findBackend() const
+{
+    auto* grid = m_window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));
+    return grid ? qvariant_cast<SudokuBackend*>(grid->property("backend")) : nullptr;
+}
 
 void TestSudokuGui::initTestCase()
 {
@@ -115,6 +126,42 @@ void TestSudokuGui::testArrowKeyNavigation()
     QVERIFY(driver.cell(0, 0).isFocused());
     driver.press(Qt::Key_Up);
     QVERIFY(driver.cell(0, 0).isFocused());
+}
+
+void TestSudokuGui::testCellDriverSurvivesModelReset()
+{
+    SudokuBackend* backend = findBackend();
+    QVERIFY2(backend, "SudokuGrid.backend not found");
+
+    // 리셋 이전에 핸들을 얻어 둔다 (임시 SudokuDriver에서 받은 값 복사 핸들)
+    CellDriver cell{SudokuDriver::on(m_window).cell(0, 0)};
+    CellDriver neighbor{cell.cell(1, 1)}; // 체이닝으로 얻은 핸들도 함게 검증
+
+    cell.click().type("5");
+    QCOMPARE(cell.value(), 5);
+
+    // 리셋 전 델리게이트를 약한 참조로 보관 (파괴 완료를 동기화 조건으로 사용)
+    QPointer<QQuickItem> oldCell = cell.item();
+    QPointer<QQuickItem> oldNeighbor = neighbor.item();
+
+    // Repeater가 델리게이트를 모두 파괴/재생성하도록 모델 리셋 유발
+    QMetaObject::invokeMethod(backend, &SudokuBackend::clear);
+
+    // 옛 델리게이트가 실제로 파괴될 때까지 이벤트 루프를 돌림 (deleteLater 처리)
+    QTRY_VERIFY(oldCell.isNull());
+    QTRY_VERIFY(oldNeighbor.isNull());
+
+    // 같은 핸들이 새 델리게이트를 읽어야 한다 (값은 초기화되어 0)
+    QTRY_COMPARE(cell.value(), 0);
+    QTRY_COMPARE(neighbor.value(), 0);
+    QVERIFY(!cell.isError());
+
+    // 새 델리게이트에 대해 조작도 가능해야 한다
+    cell.click().type("7");
+    QCOMPARE(cell.value(), 7);
+    QVERIFY(cell.isFocused());
+
+    backend->clear(); // 뒷정리
 }
 
 QTEST_MAIN(TestSudokuGui)

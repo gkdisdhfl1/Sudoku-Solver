@@ -33,6 +33,10 @@ qt_add_qml_module(SudokuCore
 target_include_directories(SudokuCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(SudokuCore PUBLIC Qt6::Quick)
 
+set_target_properties(SudokuCore PROPERTIES
+    QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/SudokuSolver"
+)
+
 qt_add_executable(appSudokuSolver main.cpp)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

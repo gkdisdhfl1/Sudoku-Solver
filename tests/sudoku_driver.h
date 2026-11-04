@@ -20,8 +20,10 @@ namespace sudoku_test {
             return nullptr;
 
         QQuickItem* cell = nullptr;
-        QMetaObject::invokeMethod(repeater, "itemAt", Qt::DirectConnection, Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, index));
+        const bool ok = QMetaObject::invokeMethod(repeater, "itemAt", Qt::DirectConnection, Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, index));
 
+        if (!ok)
+            qWarning("Repeater.itemAt invocation failed (method renamed or signature changed?)");
         return cell;
     }
 } // namespace sudoku_test
