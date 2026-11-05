@@ -1,4 +1,7 @@
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 function(qtest_register_tests target source_file suite_name)
+    cmake_parse_arguments(ARG "" "" "ENVIRONMENT" ${ARGN})
     file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}" test_lines
         REGEX "^[ \t]*void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
     foreach(line IN LISTS test_lines)
@@ -13,6 +16,9 @@ function(qtest_register_tests target source_file suite_name)
                 set_tests_properties("${test_id}" PROPERTIES
                     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"                
                 )
+            endif()
+            if(ARG_ENVIRONMENT)
+                set_property(TEST "${test_id}" APPEND PROPERTY ENVIRONMENT ${ARG_ENVIRONMENT})
             endif()
         endif()
     endforeach()
@@ -39,14 +45,25 @@ qtest_register_tests(tst_sudoku_solver tst_sudoku_solver.cpp SudokuSolver)
 # ==============================================================================
 qt_add_executable(tst_sudoku_backend
     tst_sudoku_backend.cpp
-    ${CMAKE_SOURCE_DIR}/sudoku_backend.cpp
-    ${CMAKE_SOURCE_DIR}/sudoku_backend.h
-    ${CMAKE_SOURCE_DIR}/sudoku_solver.cpp
-    ${CMAKE_SOURCE_DIR}/sudoku_solver.h
-    ${CMAKE_SOURCE_DIR}/solver_worker.cpp
-    ${CMAKE_SOURCE_DIR}/solver_worker.h
-    ${CMAKE_SOURCE_DIR}/sudoku_constants.h
 )
-target_include_directories(tst_sudoku_backend PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(tst_sudoku_backend PRIVATE Qt6::Test Qt6::Quick)
+target_link_libraries(tst_sudoku_backend PRIVATE Qt6::Test SudokuCore)
 qtest_register_tests(tst_sudoku_backend tst_sudoku_backend.cpp SudokuBackend)
+
+# ==============================================================================
+# 3. Sudoku GUI E2E 상호작용 테스트 (Semantic Action DSL)
+# ==============================================================================
+qt_add_executable(tst_sudoku_gui
+    tst_sudoku_gui.cpp
+    sudoku_driver.h
+)
+target_link_libraries(tst_sudoku_gui PRIVATE
+    Qt6::Test Qt6::Quick Qt6::Qml
+    SudokuCore SudokuCoreplugin
+)
+
+
+qtest_register_tests(tst_sudoku_gui tst_sudoku_gui.cpp SudokuGui
+    ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_CONTROLS_STYLE=Basic"
+)

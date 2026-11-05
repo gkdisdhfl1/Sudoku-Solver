@@ -11,12 +11,10 @@ qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 
-qt_add_executable(appSudokuSolver
-    main.cpp
-    sudoku_constants.h
-)
+# QML 모듈 + 백엔드 로직 정적 라이브러리로 분리 (앱/테스트 공유)
+qt_add_library(SudokuCore STATIC)
 
-qt_add_qml_module(appSudokuSolver
+qt_add_qml_module(SudokuCore
     URI SudokuSolver
     QML_FILES
         qml/Main.qml
@@ -29,7 +27,17 @@ qt_add_qml_module(appSudokuSolver
         SOURCES sudoku_backend.h sudoku_backend.cpp
         SOURCES sudoku_solver.h sudoku_solver.cpp
         SOURCES solver_worker.h solver_worker.cpp
+        SOURCES sudoku_constants.h
 )
+
+target_include_directories(SudokuCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(SudokuCore PUBLIC Qt6::Quick)
+
+set_target_properties(SudokuCore PROPERTIES
+    QT_QML_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/SudokuSolver"
+)
+
+qt_add_executable(appSudokuSolver main.cpp)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
@@ -43,7 +51,10 @@ set_target_properties(appSudokuSolver PROPERTIES
 )
 
 target_link_libraries(appSudokuSolver
-    PRIVATE Qt6::Quick
+    PRIVATE
+        Qt6::Quick
+        SudokuCore
+        SudokuCoreplugin    # 정적 QML 플러그인(타입 등록/리소스 초기화)
 )
 
 # CMake 표준 테스트 모듈 (BUILD_TESTING 옵션을 자동 생성하며 기본값은 ON)
