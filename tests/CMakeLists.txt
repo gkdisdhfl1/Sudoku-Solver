@@ -1,6 +1,7 @@
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 function(qtest_register_tests target source_file suite_name)
+    cmake_parse_arguments(ARG "" "" "ENVIRONMENT" ${ARGN})
     file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}" test_lines
         REGEX "^[ \t]*void[ \t]+test[A-Za-z0-9_]+[ \t]*\\(")
     foreach(line IN LISTS test_lines)
@@ -15,6 +16,9 @@ function(qtest_register_tests target source_file suite_name)
                 set_tests_properties("${test_id}" PROPERTIES
                     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"                
                 )
+            endif()
+            if(ARG_ENVIRONMENT)
+                set_property(TEST "${test_id}" APPEND PROPERTY ENVIRONMENT ${ARG_ENVIRONMENT})
             endif()
         endif()
     endforeach()
@@ -58,9 +62,8 @@ target_link_libraries(tst_sudoku_gui PRIVATE
 )
 
 
-qtest_register_tests(tst_sudoku_gui tst_sudoku_gui.cpp SudokuGui)
-
-# 오프스크린 QPA 강제
-set_tests_properties(SudokuGui.testCellClickAndTypeOverwrite SudokuGui.testArrowKeyNavigation PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+qtest_register_tests(tst_sudoku_gui tst_sudoku_gui.cpp SudokuGui
+    ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_CONTROLS_STYLE=Basic"
 )

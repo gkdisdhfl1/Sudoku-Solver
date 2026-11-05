@@ -26,6 +26,11 @@ namespace sudoku_test {
             qWarning("Repeater.itemAt invocation failed (method renamed or signature changed?)");
         return cell;
     }
+
+    inline QQuickItem* findRepeater(QQuickWindow* window) {
+        auto* grid = window ? window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid")) : nullptr;
+        return grid ? grid->findChild<QQuickItem*>(QStringLiteral("cellRepeater")) : nullptr;
+    }
 } // namespace sudoku_test
 
 // ==============================================================================
@@ -47,26 +52,28 @@ public:
     }
 
     // 1. 마우스 클릭 (동적 중심 좌표 계산)
+    // 클릭 후 해당 셀이 실제로 activeFocus를 획득할 대까지 조건 대기
     CellDriver& click() {
         if (QQuickItem* it = item()) {
             QPointF localCenter(it->width() / 2.0, it->height() / 2.0);
             QPointF scenePos = it->mapToScene(localCenter);
             QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, scenePos.toPoint());
-            QTest::qWait(20);
+            const bool ok = QTest::qWaitFor([this] { return isFocused(); });
+            [&] {
+                QVERIFY2(ok, qPrintable(QStringLiteral("Cell %1 failed to gain active focus after click").arg(m_index)));
+            }();
         }
         return *this;
     }
 
     // 2. 키보드 숫자 문자열 입력
-    // 주의: 키는 윈도우로 전달되므로 현재 포커스된 위치에 입력된다
-    // item() 호출은 셀 존재 여부 확인용
+    // QTest::keyClick은 동기로 전달되므로 고정 qWait 없이 즉시 전달 후 이벤트 처리
     CellDriver& type(const QString& text) {
         if (item() && m_window) {
             for (const QChar& ch : text) {
                 QTest::keyClick(m_window, ch.toLatin1());
-                QTest::qWait(10);
+                QCoreApplication::processEvents();
             }
-            QTest::qWait(20);
         }
         return *this;
     }
@@ -75,7 +82,7 @@ public:
     CellDriver& press(Qt::Key key) {
         if (item() && m_window) {
             QTest::keyClick(m_window, key);
-            QTest::qWait(20);
+            QCoreApplication::processEvents();
         }
         return *this;
     }
@@ -108,9 +115,33 @@ public:
         return m_index;
     }
 
+    // QVERIFY 없이 '지금' 셀이 트리에 존재하는지만 반환 (사전 검증/조건 분기용)
+    [[nodiscard]] bool exists() const {
+        return sudoku_test::findCellItem(m_window, m_index) != nullptr;
+    }
+
     // 체이닝 연계: 다른 셀로 즉시 전환
     CellDriver cell(int row, int col) const;
     CellDriver cell(int index) const;
+
+    // 포커스를 획득갈 때까지 대기하는 명시적 헬퍼
+    CellDriver& waitForFocus(int timeoutMs = 5000) {
+        const bool ok = QTest::qWaitFor([this] { return isFocused(); }, timeoutMs);
+        [&] {
+            QVERIFY2(ok, qPrintable(QStringLiteral("Cell %1 timed out wating for active focus").arg(m_index)));
+        }();
+        return *this;
+    }
+
+    // 특정 셀 값을 가질 때까지 대기하는 명시적 헬퍼
+    CellDriver& waitForValue(int expected, int timeoutMs = 5000) {
+        const bool ok = QTest::qWaitFor([this, expected] { return value() == expected; }, timeoutMs);
+        [&] {
+            QVERIFY2(ok, qPrintable(QStringLiteral("Cell %1 timed out waiting for value %2 (current: %3)")
+                .arg(m_index).arg(expected).arg(value())));
+        }();
+        return *this;
+    }
 
 private:
     QPointer<QQuickWindow> m_window; // 창은 테스트 케이스 동안 정체성이 바뀌지 않으므로 이것만 유지
@@ -142,7 +173,7 @@ public:
     SudokuDriver& press(Qt::Key key) {
         if (m_window) {
             QTest::keyClick(m_window, key);
-            QTest::qWait(20);
+            QCoreApplication::processEvents();
         }
         return *this;
     }
