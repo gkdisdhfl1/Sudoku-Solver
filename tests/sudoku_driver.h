@@ -8,14 +8,18 @@
 class SudokuDriver;
 
 namespace sudoku_test {
-    // objectName 기반 조회 (휴리스틱 fallback 제거), 매 호출마다 현재 델리게이트를 반환
-    inline QQuickItem* findCellItem(QQuickWindow* window, int index) {
-        if (!window || index < 0 || index >= 81)
+    // 리피터는 윈도우 라이프타임 도안 파괴되지 않는 불변 컴포넌트
+    inline QQuickItem* findRepeater(QQuickWindow* window) {
+        if (!window)
             return nullptr;
 
         auto* grid = window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));
-        auto* repeater = grid ? grid->findChild<QQuickItem*>(QStringLiteral("cellRepeater")) : nullptr;
-        if (!repeater)
+        return grid ? grid->findChild<QQuickItem*>(QStringLiteral("cellRepeater")) : nullptr;
+    }
+
+    // Repeater.itemAt 호출 헬퍼
+    inline QQuickItem* fetchCellFromRepeater(QQuickItem* repeater, int index) {
+        if (!repeater || index < 0 || index >= 81)
             return nullptr;
 
         QQuickItem* cell = nullptr;
@@ -26,10 +30,6 @@ namespace sudoku_test {
         return cell;
     }
 
-    inline QQuickItem* findRepeater(QQuickWindow* window) {
-        auto* grid = window ? window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid")) : nullptr;
-        return grid ? grid->findChild<QQuickItem*>(QStringLiteral("cellRepeater")) : nullptr;
-    }
 } // namespace sudoku_test
 
 // ==============================================================================
@@ -37,17 +37,23 @@ namespace sudoku_test {
 // ==============================================================================
 class CellDriver {
 public:
-   CellDriver(QQuickWindow* window, int index) : m_window(window), m_index(index) {}
+   CellDriver(QQuickWindow* window, QQuickItem* repeater, int index) 
+        : m_window(window), m_repeater(repeater), m_index(index) {}
 
-    // 셀의 정체성은 m_index. 포인터를 캐시하지 않고 매번 조회 -> 모델 리셋 이후에도 유효
-    // 반환값을 변수에 저장하지 말 것 (clear() 등으로 델리게이트가 재생성되면 무효화됨).
-    // 셀을 찾지 못하면 실패로 기록한다. QTest::setThrowOnFail(true)가 켜져 있으면
-    // 예외로 테스트 함수가 즉시 중단되며, 그렇지 않으면 nullptr을 반환한다.
+    // 자가 치유(Self-Healing) 캐시:
+    // 평상시에는 O(1) 캐시 반환, 모델 리셋으로 파괴되면 QPointer가 자동으로 null이 되어 repeater에서 재취득
     QQuickItem* item() const {
-        QQuickItem* it = sudoku_test::findCellItem(m_window, m_index);
-        // QVERIFY는 'return';으로 확장되므로 void 람다로 감쌈
-        [&] { QVERIFY2(it, qPrintable(QStringLiteral("Cell %1 not found in QML tree").arg(m_index))); }();
-        return it;
+        if (m_cachedCell) {
+            return m_cachedCell.data();
+        }
+        if (!m_repeater && m_window) {
+            m_repeater = sudoku_test::findRepeater(m_window);
+        }
+        m_cachedCell = sudoku_test::fetchCellFromRepeater(m_repeater, m_index);
+        [&] {
+            QVERIFY2(m_cachedCell, qPrintable(QStringLiteral("Cell %1 not found in QML tree").arg(m_index)));
+        }();
+        return m_cachedCell.data();
     }
 
     // 1. 마우스 클릭 (동적 중심 좌표 계산)
@@ -107,9 +113,13 @@ public:
     bool isFocused() const {
         QQuickItem* it = item();
 
-        // SudokuCell 내부의 iputField가 실제 키보드 포커스를 쥐고 있는지 검증
-        QQuickItem* input = it ? it->findChild<QQuickItem*>(QStringLiteral("inputField")) : nullptr;
-        return input && input->hasActiveFocus();
+        if (!it)
+            return false;
+        // inputField 또한 셀이 파괴되지 않는 한 동일하므로 약한 참조 캐싱
+        if (!m_cachedInput) {
+            m_cachedInput = it->findChild<QQuickItem*>(QStringLiteral("inputField"));
+        }
+        return m_cachedInput && m_cachedInput->hasActiveFocus();
     }
 
     QVariantList candidates() const {
@@ -123,7 +133,7 @@ public:
 
     // QVERIFY 없이 '지금' 셀이 트리에 존재하는지만 반환 (사전 검증/조건 분기용)
     [[nodiscard]] bool exists() const {
-        return sudoku_test::findCellItem(m_window, m_index) != nullptr;
+        return item() != nullptr;
     }
 
     // 체이닝 연계: 다른 셀로 즉시 전환
@@ -150,7 +160,10 @@ public:
     }
 
 private:
-    QPointer<QQuickWindow> m_window; // 창은 테스트 케이스 동안 정체성이 바뀌지 않으므로 이것만 유지
+    QPointer<QQuickWindow> m_window;
+    mutable QPointer<QQuickItem> m_repeater;
+    mutable QPointer<QQuickItem> m_cachedCell;
+    mutable QPointer<QQuickItem> m_cachedInput;
     int m_index;
 };
 
@@ -159,7 +172,8 @@ private:
 // ==============================================================================
 class SudokuDriver {
 public:
-    explicit SudokuDriver(QQuickWindow* window) : m_window(window) {}
+    explicit SudokuDriver(QQuickWindow* window) 
+        : m_window(window), m_repeater(sudoku_test::findRepeater(window)) {}
     
     static SudokuDriver on(QQuickWindow* window) {
         return SudokuDriver(window);
@@ -167,12 +181,12 @@ public:
 
     // 특정 셀 획득 (row: 0~8, col: 0~8)
     CellDriver cell(int row, int col) const {
-        return {m_window, row * 9 + col};
+        return {m_window, m_repeater ,row * 9 + col};
     }
 
     // 특정 셀 획득 (1차원 index: 0~80)
     CellDriver cell(int index) const {
-        return {m_window, index}; // 생성 시점에는 조회하지 않음
+        return {m_window, m_repeater, index};
     }
 
     // 전역 키 입력
@@ -192,13 +206,14 @@ public:
 
 private:
     QQuickWindow* m_window;
+    QPointer<QQuickItem> m_repeater;
 };
 
 // CellDriver 인라인 구현
 inline CellDriver CellDriver::cell(int row, int col) const{
-    return {m_window, row * 9 + col};
+    return {m_window, m_repeater, row * 9 + col};
 }
 
 inline CellDriver CellDriver::cell(int index) const{
-    return {m_window, index};
+    return {m_window, m_repeater, index};
 }

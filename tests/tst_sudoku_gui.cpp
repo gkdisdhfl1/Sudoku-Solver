@@ -293,15 +293,15 @@ void TestSudokuGui::resetBoard()
     QVERIFY2(grid, "sudokuGrid not found");
     grid->setProperty("focusedIndex", -1);
 
-    // 3. 보드/에러/후보 캐시 초기화 (모델 리셋으로 델리게이트가 재생성됨)
-    QPointer<QQuickItem> oldFirstCell = sudoku_test::findCellItem(m_window, 0);
+    // 3. repeater 획득 및 모델 리셋 전 첫 번째 델리게이트 추적
+    auto* repeater = sudoku_test::findRepeater(m_window);
+    QVERIFY(repeater);
+    QPointer<QQuickItem> oldFirstCell = sudoku_test::fetchCellFromRepeater(repeater, 0);
     backend->clear();
 
     // 4. 옛 델리게이트 파괴와 새 델리게이트 생성 완료까지 대기
     if (oldFirstCell)
         QTRY_VERIFY(oldFirstCell.isNull());
-    auto* repeater = sudoku_test::findRepeater(m_window); // 이전 제안의 헬퍼
-    QVERIFY(repeater);
     QTRY_COMPARE(repeater->property("count").toInt(), 81);
     QVERIFY(!backend->hasErrors());
 }
