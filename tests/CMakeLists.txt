@@ -1,5 +1,3 @@
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 function(qtest_register_tests target source_file suite_name)
     cmake_parse_arguments(ARG "" "" "ENVIRONMENT" ${ARGN})
     file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}" test_lines

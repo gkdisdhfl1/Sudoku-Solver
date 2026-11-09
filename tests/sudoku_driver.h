@@ -2,7 +2,6 @@
 
 #include <QQuickWindow>
 #include <QQuickItem>
-#include <QtTest>
 #include <QTest>
 #include <QString>
 
@@ -71,7 +70,14 @@ public:
     CellDriver& type(const QString& text) {
         if (item() && m_window) {
             for (const QChar& ch : text) {
-                QTest::keyClick(m_window, ch.toLatin1());
+                const char ascii = ch.toLatin1();
+                [&] {
+                    QVERIFY2(
+                        ascii != '\0',
+                        qPrintable(QStringLiteral("Non-Latin1 character '%1' cannot be typed in CellDriver::type").arg(ch))
+                    );
+                }();
+                QTest::keyClick(m_window, ascii);
                 QCoreApplication::processEvents();
             }
         }

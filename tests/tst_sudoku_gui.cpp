@@ -23,6 +23,15 @@ private slots:
     // 3. 모델 리셋(clear) 후에도 이전에 얻은 CellDriver가 새 델리게이트를 가리키는지 검증
     void testCellDriverSurvivesModelReset();
 
+    // 4. 중복 숫자 입력 시 isError() 하이라이트 발생 및 삭제 시 해제 검증
+    void testConflictHighlightsError();
+
+    // 5. 셀 값 입력 시 동일 행/열/블록 피어 셀들의 candidates() 실시간 동기화 검증
+    void testPeerCandidatesSyncOnInput();
+
+    // 6. 백엔드가 작업 중(isBusy)일 때 UI 조작 방지(enabled: false) 검증
+    void testGridDisabledWhileBusy();
+
 private:
     SudokuBackend* findBackend() const;
     void resetBoard();
@@ -42,10 +51,10 @@ void TestSudokuGui::initTestCase()
     QTest::setThrowOnFail(true); // 드라이버 헬퍼의 QVERIFY 실패 시 테스트 함수 즉시 중단
     m_engine = std::make_unique<QQmlApplicationEngine>();
 
-    // 빌드 디렉토리에 생성된 SudokuSolver QML 모듈 경로 추가
-    #ifdef TEST_QML_IMPORT_DIR
-    m_engine->addImportPath(TEST_QML_IMPORT_DIR);
-    #endif
+    // // 빌드 디렉토리에 생성된 SudokuSolver QML 모듈 경로 추가
+    // #ifdef TEST_QML_IMPORT_DIR
+    // m_engine->addImportPath(TEST_QML_IMPORT_DIR);
+    // #endif
 
     m_engine->loadFromModule("SudokuSolver", "Main");
 
@@ -132,11 +141,20 @@ void TestSudokuGui::testArrowKeyNavigation()
     driver.press(Qt::Key_Up);
     QTRY_VERIFY(driver.cell(0, 0).isFocused());
 
-    // 6. 경계 조건 검증: 최상단 (0, 0)에서 위/왼쪽 키를 눌러도 보드 밖으로 튀지 않고 (0, 0) 유지
+    // 6. 경계 조건 검증
+    // 최상단 (0, 0)에서 위/왼쪽 키를 눌러도 보드 밖으로 튀지 않고 (0, 0) 유지
     driver.press(Qt::Key_Left);
     QTRY_VERIFY(driver.cell(0, 0).isFocused());
     driver.press(Qt::Key_Up);
     QTRY_VERIFY(driver.cell(0, 0).isFocused());
+
+    // 최하단(8, 8)에서 아래/오른쪽 키를 눌러도 보드 밖으로 튀지 않고 (8, 8) 유지
+    driver.cell(8, 8).click();
+    QTRY_VERIFY(driver.cell(8, 8).isFocused());
+    driver.press(Qt::Key_Right);
+    QTRY_VERIFY(driver.cell(8, 8).isFocused());
+    driver.press(Qt::Key_Down);
+    QTRY_VERIFY(driver.cell(8, 8).isFocused());
 }
 
 void TestSudokuGui::testCellDriverSurvivesModelReset()
@@ -173,6 +191,89 @@ void TestSudokuGui::testCellDriverSurvivesModelReset()
     QVERIFY(cell.isFocused());
 
     backend->clear(); // 뒷정리
+}
+
+void TestSudokuGui::testConflictHighlightsError()
+{
+    SudokuDriver driver(m_window);
+
+    // 1. (0, 0)에 5 입력 -> 단독 입력 시 에러 없음
+    driver.cell(0, 0).click().type("5");
+    QTRY_COMPARE(driver.cell(0, 0).value(), 5);
+    QVERIFY(!driver.cell(0, 0).isError());
+
+    // 2. 같은 행의 (0, 1)에 동일한 숫자 5 입력 -> 충돌 발생으로 두 셀 모두 isError() == true
+    driver.cell(0, 1).click().type("5");
+    QTRY_COMPARE(driver.cell(0, 1).value(), 5);
+    QVERIFY(driver.cell(0, 0).isError());
+    QVERIFY(driver.cell(0, 1).isError());
+
+    // 3. (0, 1)의 숫자를 지움 -> 충돌 해소로 두 셀 모두 isError() == false 원복
+    driver.cell(0, 1).press(Qt::Key_Backspace);
+    QTRY_COMPARE(driver.cell(0, 1).value(), 0);
+    QVERIFY(!driver.cell(0, 0).isError());
+    QVERIFY(!driver.cell(0, 1).isError());
+}
+
+void TestSudokuGui::testPeerCandidatesSyncOnInput()
+{
+    SudokuDriver driver(m_window);
+
+    // 1. 초기 상태: 모든 빈 셀은 1~9 후보를 가짐 (숫자 5 포함 확인)
+    QVERIFY(driver.cell(0, 1).candidates().contains(5)); // 같은 행
+    QVERIFY(driver.cell(1, 0).candidates().contains(5)); // 같은 열
+    QVERIFY(driver.cell(1, 1).candidates().contains(5)); // 같은 3x3 블록
+    QVERIFY(driver.cell(8, 8).candidates().contains(5)); // 무관한 비피어 셀
+
+    // 2. (0, 0)에 5 입력
+    driver.cell(0, 0).click().type("5");
+    QTRY_COMPARE(driver.cell(0, 0).value(), 5);
+
+    // 3. 피어 셀들의 candidates()에서 숫자 5가 즉시 제외되었는지 검증
+    QTRY_VERIFY(!driver.cell(0, 1).candidates().contains(5)); // 같은 행
+    QTRY_VERIFY(!driver.cell(1, 0).candidates().contains(5)); // 같은 열
+    QTRY_VERIFY(!driver.cell(1, 1).candidates().contains(5)); // 같은 3x3 블록
+
+    // 4. 대조군: 행/열/블록이 무관한 (8, 8) 셀은 여전히 5를 후보로 유지해야 함
+    QVERIFY(driver.cell(8, 8).candidates().contains(5));
+
+    // 5. (0, 0)의 5를 지웠을 때 피어들의 후보 5가 다시 복원되는지 검증
+    driver.cell(0, 0).press(Qt::Key_Backspace);
+    QTRY_COMPARE(driver.cell(0, 0).value(), 0);
+    QTRY_VERIFY(driver.cell(0, 1).candidates().contains(5)); // 같은 행
+    QTRY_VERIFY(driver.cell(1, 0).candidates().contains(5)); // 같은 열
+    QTRY_VERIFY(driver.cell(1, 1).candidates().contains(5)); // 같은 3x3 블록
+}
+
+void TestSudokuGui::testGridDisabledWhileBusy()
+{
+    SudokuBackend* backend = findBackend();
+    QVERIFY2(backend, "SudokuGrid.backend not found");
+
+    auto* grid = m_window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));
+    QVERIFY2(grid, "sudokuGrid not found");
+
+    SudokuDriver driver(m_window);
+
+    // 1. 시각화 지연(500ms) 설정 후 풀이 시작하여 isBusy 상태 지속 유도
+    backend->setVisualize(true);
+    backend->setDelay(500);
+    backend->solve();
+
+    QTRY_VERIFY(backend->isBusy());
+
+    // 2. SudokuGrid의 enalbed 프로퍼티가 false로 비활성화되었는지 검증
+    QTRY_COMPARE(grid->property("enabled").toBool(), false);
+
+    // 3. isBusy 상태에서 백엔드 setCell 호출 시도 -> 무시되어야 함
+    backend->setCell(80, 9);
+    QVERIFY(driver.cell(80).value() != 9);
+
+    // 4. 뒷정리: 워커 안전 중단 및 설정 초기화
+    backend->stop();
+    QTRY_VERIFY(!backend->isBusy());
+    backend->setVisualize(false);
+    backend->setDelay(0);
 }
 
 // 앞 테스트(실패 포함)의 상태가 남지 않도록 보드 전체와 UI 상태를 초기화
