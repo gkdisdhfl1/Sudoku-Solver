@@ -40,20 +40,13 @@ public:
    CellDriver(QQuickWindow* window, QQuickItem* repeater, int index) 
         : m_window(window), m_repeater(repeater), m_index(index) {}
 
-    // 자가 치유(Self-Healing) 캐시:
-    // 평상시에는 O(1) 캐시 반환, 모델 리셋으로 파괴되면 QPointer가 자동으로 null이 되어 repeater에서 재취득
+    // 셀의 정체성은 m_index. lookup()을 통해 Repeater에서 '현재' 델리게이트를 매번 조회 (O(1))
     QQuickItem* item() const {
-        if (m_cachedCell) {
-            return m_cachedCell.data();
-        }
-        if (!m_repeater && m_window) {
-            m_repeater = sudoku_test::findRepeater(m_window);
-        }
-        m_cachedCell = sudoku_test::fetchCellFromRepeater(m_repeater, m_index);
+        QQuickItem* it = lookup();
         [&] {
-            QVERIFY2(m_cachedCell, qPrintable(QStringLiteral("Cell %1 not found in QML tree").arg(m_index)));
+            QVERIFY2(it, qPrintable(QStringLiteral("Cell %1 not found in QML tree").arg(m_index)));
         }();
-        return m_cachedCell.data();
+        return it;
     }
 
     // 1. 마우스 클릭 (동적 중심 좌표 계산)
@@ -73,7 +66,9 @@ public:
 
     // 2. 키보드 숫자 문자열 입력
     // QTest::keyClick은 동기로 전달되므로 고정 qWait 없이 즉시 전달 후 이벤트 처리
+    // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
     CellDriver& type(const QString& text) {
+        focus();
         if (item() && m_window) {
             for (const QChar& ch : text) {
                 const char ascii = ch.toLatin1();
@@ -91,7 +86,9 @@ public:
     }
 
     // 3. 단일 키 입력 (방향키, Backsapce, Delete 등). 포커스 된 위치 기준
+    // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
     CellDriver& press(Qt::Key key) {
+        focus();
         if (item() && m_window) {
             QTest::keyClick(m_window, key);
             QCoreApplication::processEvents();
@@ -115,11 +112,9 @@ public:
 
         if (!it)
             return false;
-        // inputField 또한 셀이 파괴되지 않는 한 동일하므로 약한 참조 캐싱
-        if (!m_cachedInput) {
-            m_cachedInput = it->findChild<QQuickItem*>(QStringLiteral("inputField"));
-        }
-        return m_cachedInput && m_cachedInput->hasActiveFocus();
+        
+        auto* input{it->findChild<QQuickItem*>(QStringLiteral("inputField"))};
+        return input && input->hasActiveFocus();
     }
 
     QVariantList candidates() const {
@@ -133,7 +128,7 @@ public:
 
     // QVERIFY 없이 '지금' 셀이 트리에 존재하는지만 반환 (사전 검증/조건 분기용)
     [[nodiscard]] bool exists() const {
-        return item() != nullptr;
+        return lookup() != nullptr;
     }
 
     // 체이닝 연계: 다른 셀로 즉시 전환
@@ -159,11 +154,24 @@ public:
         return *this;
     }
 
+    // 대상 셀로 포커스 이동 (이미 활성 포커스를 가지고 있다면 No-op)
+    CellDriver& focus() {
+        if (!isFocused()) {
+            click();
+        }
+        return *this;
+    }
+
 private:
+    // Repeater는 윈도우 수명 동안 유지되므로 이것만 캐시. 셀은 정체성이 m_index이므로 캐시하지 않음
+    QQuickItem* lookup() const {
+        if (!m_repeater && m_window)
+            m_repeater = sudoku_test::findRepeater(m_window);
+        return sudoku_test::fetchCellFromRepeater(m_repeater, m_index);
+    }
+
     QPointer<QQuickWindow> m_window;
     mutable QPointer<QQuickItem> m_repeater;
-    mutable QPointer<QQuickItem> m_cachedCell;
-    mutable QPointer<QQuickItem> m_cachedInput;
     int m_index;
 };
 

@@ -176,6 +176,12 @@ void TestSudokuGui::testCellDriverSurvivesModelReset()
     // Repeater가 델리게이트를 모두 파괴/재생성하도록 모델 리셋 유발
     QMetaObject::invokeMethod(backend, &SudokuBackend::clear);
 
+    // 이벤트 루프를 돌리기 전에도 같은 핸들이 '새' 델리게이트를 가리켜야 함
+    auto* repeater{sudoku_test::findRepeater(m_window)};
+    QCOMPARE(cell.item(), sudoku_test::fetchCellFromRepeater(repeater, 0));
+    QCOMPARE(cell.value(), 0);
+    QCOMPARE(neighbor.value(), 0);
+
     // 옛 델리게이트가 실제로 파괴될 때까지 이벤트 루프를 돌림 (deleteLater 처리)
     QTRY_VERIFY(oldCell.isNull());
     QTRY_VERIFY(oldNeighbor.isNull());
@@ -265,15 +271,25 @@ void TestSudokuGui::testGridDisabledWhileBusy()
     // 2. SudokuGrid의 enalbed 프로퍼티가 false로 비활성화되었는지 검증
     QTRY_COMPARE(grid->property("enabled").toBool(), false);
 
-    // 3. isBusy 상태에서 백엔드 setCell 호출 시도 -> 무시되어야 함
-    backend->setCell(80, 9);
-    QVERIFY(driver.cell(80).value() != 9);
+    // 3. 실제 GUI 입력 시도 -> 비활성 그리드는 포커스/입력을 받지 않아야 함
+    //    click()은 포커스 획득을 기다리며 단언하므로 원시 이벤트를 사용
+    QQuickItem* cell80 {driver.cell(80).item()};
+    QPointF center {cell80->width() / 2.0, cell80->height() / 2.0};
+    QPointF scenePos {cell80->mapToScene(center)};
+    QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, scenePos.toPoint());
+    QCoreApplication::processEvents();
+    QVERIFY(!driver.cell(80).isFocused());
 
-    // 4. 뒷정리: 워커 안전 중단 및 설정 초기화
+    // 4. 포커스가 없으므로 키보드를 눌러도 셀 값에 아무런 영향이 없어야 함
+    QTest::keyClick(m_window, '9');
+    QCoreApplication::processEvents();
+    QCOMPARE(driver.cell(80).value(), 0);
+
+    // 5. 뒷정리: 워커 안전 중단 및 설정 기본값 복원
     backend->stop();
     QTRY_VERIFY(!backend->isBusy());
     backend->setVisualize(false);
-    backend->setDelay(0);
+    backend->setDelay(50);
 }
 
 // 앞 테스트(실패 포함)의 상태가 남지 않도록 보드 전체와 UI 상태를 초기화
@@ -287,6 +303,12 @@ void TestSudokuGui::resetBoard()
         backend->stop();
         QTRY_VERIFY(!backend->isBusy());
     }
+
+    // 시각화 및 지연 시간 기본값 복원 (앞선 테스트가 예외로 실패하더라도 상태 오염 방지)
+    if (backend->visualize())
+        backend->setVisualize(false);
+    if (backend->delay() != 50)
+        backend->setDelay(50);
 
     // 2. UI 상태: 포커스 대상 초기화 (리셋 전에 해야 새 델리게이트가 앞 테스트의 포커스를 이어받지 않음)
     auto* grid = m_window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));
