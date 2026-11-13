@@ -55,7 +55,7 @@ qt_add_executable(tst_sudoku_gui
     sudoku_driver.h
 )
 target_link_libraries(tst_sudoku_gui PRIVATE
-    Qt6::Test Qt6::Quick Qt6::Qml
+    Qt6::Test
     SudokuCore SudokuCoreplugin
 )
 

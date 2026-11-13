@@ -50,12 +50,6 @@ void TestSudokuGui::initTestCase()
 {
     QTest::setThrowOnFail(true); // 드라이버 헬퍼의 QVERIFY 실패 시 테스트 함수 즉시 중단
     m_engine = std::make_unique<QQmlApplicationEngine>();
-
-    // // 빌드 디렉토리에 생성된 SudokuSolver QML 모듈 경로 추가
-    // #ifdef TEST_QML_IMPORT_DIR
-    // m_engine->addImportPath(TEST_QML_IMPORT_DIR);
-    // #endif
-
     m_engine->loadFromModule("SudokuSolver", "Main");
 
     const auto rootObjects{m_engine->rootObjects()};
@@ -102,7 +96,7 @@ void TestSudokuGui::testCellClickAndTypeOverwrite()
     driver.cell(0, 0).click().type("5");
     QTRY_COMPARE(driver.cell(0, 0).value(), 5);
 
-    // 2. 이미 숫자가 채워진 상태에서 숫자 '9' 입력 -> 벡스페이스 없이 즉시 '9'로 덮어써져야 함
+    // 2. 이미 숫자가 채워진 상태에서 숫자 '9' 입력 -> 백스페이스 없이 즉시 '9'로 덮어써져야 함
     driver.cell(0, 0).type("9");
     QTRY_COMPARE(driver.cell(0, 0).value(), 9);
 
@@ -164,7 +158,7 @@ void TestSudokuGui::testCellDriverSurvivesModelReset()
 
     // 리셋 이전에 핸들을 얻어 둔다 (임시 SudokuDriver에서 받은 값 복사 핸들)
     CellDriver cell{SudokuDriver::on(m_window).cell(0, 0)};
-    CellDriver neighbor{cell.cell(1, 1)}; // 체이닝으로 얻은 핸들도 함게 검증
+    CellDriver neighbor{cell.cell(1, 1)}; // 체이닝으로 얻은 핸들도 함께 검증
 
     cell.click().type("5");
     QCOMPARE(cell.value(), 5);
@@ -174,7 +168,7 @@ void TestSudokuGui::testCellDriverSurvivesModelReset()
     QPointer<QQuickItem> oldNeighbor = neighbor.item();
 
     // Repeater가 델리게이트를 모두 파괴/재생성하도록 모델 리셋 유발
-    QMetaObject::invokeMethod(backend, &SudokuBackend::clear);
+    backend->clear();
 
     // 이벤트 루프를 돌리기 전에도 같은 핸들이 '새' 델리게이트를 가리켜야 함
     auto* repeater{sudoku_test::findRepeater(m_window)};
@@ -268,7 +262,7 @@ void TestSudokuGui::testGridDisabledWhileBusy()
 
     QTRY_VERIFY(backend->isBusy());
 
-    // 2. SudokuGrid의 enalbed 프로퍼티가 false로 비활성화되었는지 검증
+    // 2. SudokuGrid의 enabled 프로퍼티가 false로 비활성화되었는지 검증
     QTRY_COMPARE(grid->property("enabled").toBool(), false);
 
     // 3. 실제 GUI 입력 시도 -> 비활성 그리드는 포커스/입력을 받지 않아야 함

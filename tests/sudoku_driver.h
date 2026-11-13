@@ -5,10 +5,8 @@
 #include <QTest>
 #include <QString>
 
-class SudokuDriver;
-
 namespace sudoku_test {
-    // 리피터는 윈도우 라이프타임 도안 파괴되지 않는 불변 컴포넌트
+    // 리피터는 윈도우 라이프타임 동안 파괴되지 않는 불변 컴포넌트
     inline QQuickItem* findRepeater(QQuickWindow* window) {
         if (!window)
             return nullptr;
@@ -65,7 +63,7 @@ public:
     }
 
     // 2. 키보드 숫자 문자열 입력
-    // QTest::keyClick은 동기로 전달되므로 고정 qWait 없이 즉시 전달 후 이벤트 처리
+    // QTest::keyClick(QWindow*)는 동기로 전달되므로 별도 대기/processEvents 없이 즉시 전달
     // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
     CellDriver& type(const QString& text) {
         focus();
@@ -79,19 +77,17 @@ public:
                     );
                 }();
                 QTest::keyClick(m_window, ascii);
-                QCoreApplication::processEvents();
             }
         }
         return *this;
     }
 
-    // 3. 단일 키 입력 (방향키, Backsapce, Delete 등). 포커스 된 위치 기준
+    // 3. 단일 키 입력 (방향키, Backspace, Delete 등). 포커스 된 위치 기준
     // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
     CellDriver& press(Qt::Key key) {
         focus();
         if (item() && m_window) {
             QTest::keyClick(m_window, key);
-            QCoreApplication::processEvents();
         }
         return *this;
     }
@@ -135,11 +131,11 @@ public:
     CellDriver cell(int row, int col) const;
     CellDriver cell(int index) const;
 
-    // 포커스를 획득갈 때까지 대기하는 명시적 헬퍼
+    // 포커스를 획득할 때까지 대기하는 명시적 헬퍼
     CellDriver& waitForFocus(int timeoutMs = 5000) {
         const bool ok = QTest::qWaitFor([this] { return isFocused(); }, timeoutMs);
         [&] {
-            QVERIFY2(ok, qPrintable(QStringLiteral("Cell %1 timed out wating for active focus").arg(m_index)));
+            QVERIFY2(ok, qPrintable(QStringLiteral("Cell %1 timed out waiting for active focus").arg(m_index)));
         }();
         return *this;
     }
@@ -201,7 +197,6 @@ public:
     SudokuDriver& press(Qt::Key key) {
         if (m_window) {
             QTest::keyClick(m_window, key);
-            QCoreApplication::processEvents();
         }
         return *this;
     }
@@ -213,7 +208,7 @@ public:
     }
 
 private:
-    QQuickWindow* m_window;
+    QPointer<QQuickWindow> m_window;
     QPointer<QQuickItem> m_repeater;
 };
 
