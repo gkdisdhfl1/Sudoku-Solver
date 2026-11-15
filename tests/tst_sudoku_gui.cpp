@@ -33,6 +33,9 @@ private slots:
     void testGridDisabledWhileBusy();
 
 private:
+    bool m_defaultVisualize{false};
+    int m_defaultDelay{0};
+
     SudokuBackend* findBackend() const;
     void resetBoard();
 
@@ -64,6 +67,11 @@ void TestSudokuGui::initTestCase()
 
     SudokuDriver driver(m_window);
     QVERIFY2(driver.cell(0).exists() && driver.cell(80).exists(), "Cell lookup failed (itemAt 경롸 확인)");
+
+    SudokuBackend* backend = findBackend();
+    QVERIFY(backend);
+    m_defaultVisualize = backend->visualize();
+    m_defaultDelay = backend->delay();
 
     m_window->show();
     QVERIFY(QTest::qWaitForWindowExposed(m_window));
@@ -271,19 +279,11 @@ void TestSudokuGui::testGridDisabledWhileBusy()
     QPointF center {cell80->width() / 2.0, cell80->height() / 2.0};
     QPointF scenePos {cell80->mapToScene(center)};
     QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, scenePos.toPoint());
-    QCoreApplication::processEvents();
     QVERIFY(!driver.cell(80).isFocused());
 
     // 4. 포커스가 없으므로 키보드를 눌러도 셀 값에 아무런 영향이 없어야 함
     QTest::keyClick(m_window, '9');
-    QCoreApplication::processEvents();
     QCOMPARE(driver.cell(80).value(), 0);
-
-    // 5. 뒷정리: 워커 안전 중단 및 설정 기본값 복원
-    backend->stop();
-    QTRY_VERIFY(!backend->isBusy());
-    backend->setVisualize(false);
-    backend->setDelay(50);
 }
 
 // 앞 테스트(실패 포함)의 상태가 남지 않도록 보드 전체와 UI 상태를 초기화
@@ -299,10 +299,10 @@ void TestSudokuGui::resetBoard()
     }
 
     // 시각화 및 지연 시간 기본값 복원 (앞선 테스트가 예외로 실패하더라도 상태 오염 방지)
-    if (backend->visualize())
-        backend->setVisualize(false);
-    if (backend->delay() != 50)
-        backend->setDelay(50);
+    if (backend->visualize() != m_defaultVisualize)
+        backend->setVisualize(m_defaultVisualize);
+    if (backend->delay() != m_defaultDelay)
+        backend->setDelay(m_defaultDelay);
 
     // 2. UI 상태: 포커스 대상 초기화 (리셋 전에 해야 새 델리게이트가 앞 테스트의 포커스를 이어받지 않음)
     auto* grid = m_window->findChild<QQuickItem*>(QStringLiteral("sudokuGrid"));

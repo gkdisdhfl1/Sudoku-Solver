@@ -4,6 +4,8 @@
 #include <QQuickItem>
 #include <QTest>
 #include <QString>
+#include <QPointer>
+#include <QVariantList>
 
 namespace sudoku_test {
     // 리피터는 윈도우 라이프타임 동안 파괴되지 않는 불변 컴포넌트
@@ -48,7 +50,7 @@ public:
     }
 
     // 1. 마우스 클릭 (동적 중심 좌표 계산)
-    // 클릭 후 해당 셀이 실제로 activeFocus를 획득할 대까지 조건 대기
+    // 클릭 후 해당 셀이 실제로 activeFocus를 획득할 때까지 조건 대기
     CellDriver& click() {
         if (QQuickItem* it = item()) {
             QPointF localCenter(it->width() / 2.0, it->height() / 2.0);
@@ -66,8 +68,10 @@ public:
     // QTest::keyClick(QWindow*)는 동기로 전달되므로 별도 대기/processEvents 없이 즉시 전달
     // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
     CellDriver& type(const QString& text) {
-        focus();
-        if (item() && m_window) {
+        [&] {
+            QVERIFY2(isFocused(), qPrintable(QStringLiteral("Cell %1 is not focused before type()").arg(m_index)));
+        }();
+        if (m_window) {
             for (const QChar& ch : text) {
                 const char ascii = ch.toLatin1();
                 [&] {
@@ -82,11 +86,18 @@ public:
         return *this;
     }
 
-    // 3. 단일 키 입력 (방향키, Backspace, Delete 등). 포커스 된 위치 기준
-    // 대상 셀이 포커스를 쥐고 있지 않다면 자동으로 focus() 수행
+    // 편의용: 포커스가 없으면 클릭으로 포커스를 맞춘 뒤 입력 (사전 상태 세팅용)
+    CellDriver& fill(const QString& text) {
+        return focus().type(text);
+    }
+
+    // 3. 단일 키 입력 (방향키, Backspace, Delete 등 셀 단위 편집 키)
+    // 포커스된 상태를 전제로 입력하며, 포커스가 없으면 즉시 실패
     CellDriver& press(Qt::Key key) {
-        focus();
-        if (item() && m_window) {
+        [&] {
+            QVERIFY2(isFocused(), qPrintable(QStringLiteral("Cell %1 is not focused before press()").arg(m_index)));
+        }();
+        if (m_window) {
             QTest::keyClick(m_window, key);
         }
         return *this;
@@ -198,12 +209,6 @@ public:
         if (m_window) {
             QTest::keyClick(m_window, key);
         }
-        return *this;
-    }
-
-    // 대기 (UI 애니메이션 및 비동기 처리 대기)
-    SudokuDriver& wait(int ms = 50) {
-        QTest::qWait(ms);
         return *this;
     }
 
