@@ -57,6 +57,7 @@ Window {
         // 1. 스도쿠 그리드 (9x9)
         SudokuGrid {
             id: sudokuGrid
+            objectName: "sudokuGrid"
             backend: sudokuBackend
         }
 

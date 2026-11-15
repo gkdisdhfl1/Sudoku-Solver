@@ -73,6 +73,7 @@ Rectangle {
     // 2. 숫자 입력 TextField & 키보드 탐색 제어
     TextField {
         id: inputField
+        objectName: "inputField"
         anchors.fill: parent
         text: cell.value === 0 ? "" : cell.value.toString()
         font.pixelSize: 24
