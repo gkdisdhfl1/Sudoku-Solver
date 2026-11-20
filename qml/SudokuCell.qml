@@ -9,10 +9,13 @@ Rectangle {
     id: cell
 
     required property int index
-    required property int value // display 롤에 바인딩된 변수
+    required property int value         // display 롤에 바인딩된 변수
     required property bool isError
-    required property var candidates // C++ CandidatesRole 수신
-    required property bool isTarget // C++ IsTargetRole 수신
+    required property var candidates    // C++ CandidatesRole 수신
+    required property bool isTarget     // C++ IsTargetRole 수신
+    required property bool isGiven      // C++ isGivenRole 수신
+    required property int stepState     // 0: None, 1: Selecting, 2: Trying, 3: DeadEnd, 4: Backtracking
+    required property int tryingValue
     required property SudokuBackend backend
     required property var parentGrid
 
@@ -23,6 +26,7 @@ Rectangle {
 
     // 자신이 현재 포커스 대상인지 선언적 감지
     readonly property bool isFocusedCell: parentGrid.focusedIndex === cell.index
+    readonly property bool hasCandidates: cell.candidates && cell.candidates.length > 0
 
     onIsFocusedCellChanged: {
         if (isFocusedCell) {
@@ -38,36 +42,79 @@ Rectangle {
     implicitHeight: 48
 
     // 타겟 셀일 때 연한 파란색 하이라이트
-    color: inputField.activeFocus ? "#d6e4ff" : (isError ? "#ffcccc" : (isDarkBlock ? "#ecf0f1" : "#ffffff"))
+    color: {
+        if (cell.isTarget) {
+            if (cell.stepState === 3) return "#fadbd8"; // DeadEnd: 연한 빨강
+            if (cell.stepState === 4) return "#fdebd0"; // Backtracking: 연한 주황
+            if (cell.stepState === 1) return "#e8f4fd"; // Selecting: 연한 하늘색
+            return "#d6e4ff"
+        }
+        if (inputField.activeFocus) return "#d6e4ff"
+        if (cell.isError) return "#ffcccc";
+        return cell.isDarkBlock ? "#ecf0f1" : "#ffffff";
+    }
 
-    border.color: isTarget ? "#8e44ad" : "#bdc3c7"
-    border.width: isTarget ? 2 : 1
+    Behavior on color {
+        ColorAnimation { duration : 90 }
+    }
+
+    border.color: {
+        if (cell.isTarget) {
+            if (cell.stepState === 3) return "#e74c3c"; // DeadEnd
+            if (cell.stepState === 4) return "#e67e22"; // Backtracking
+            return "#2980b9";                           // Selecting / Trying
+        }
+        return "#bdc3c7";
+    }
+    border.width: cell.isTarget ? 2.5 : 1
 
     // 1. 3x3 연필 자국 소형 노트 오버레이
     GridLayout {
         anchors.fill: parent
-        anchors.margins: 2
+        anchors.margins: 3
         columns: 3
         rows: 3
-        visible: cell.value === 0 && cell.backend.visualize
+        rowSpacing: 0
+        columnSpacing: 0
+        visible: cell.backend.visualize && cell.hasCandidates && (cell.value === 0 || cell.isTarget)
+        opacity: (cell.value !== 0 && cell.isTarget) ? 0.38 : 1.0
 
         Repeater {
-            model: 9 // 1~9 위치
+            model: [1, 2, 3, 4, 5, 6, 7, 8, 9]
             Text {
-                required property int index
-                readonly property int num: index + 1
-                readonly property bool isPossible: cell.candidates ? cell.candidates.includes(num) : false
+                required property int modelData
+                readonly property int num: modelData
+                readonly property bool isPossible: cell.candidates ? (cell.candidates.indexOf(num) !== -1) : false
 
-                text: isPossible ? num.toString() : ""
-                font.pixelSize: 9
+                text: num.toString()
+                opacity: isPossible ? 1.0 : 0.0
+                font.pixelSize: cell.isTarget ? 10 : 9
                 font.bold: cell.isTarget
-                color: cell.isTarget ? "#8e44ad" : "#94a3b8" // 타겟이면 진한 보라색
+                color: {
+                    if (!cell.isTarget) return "#7f8c8d";
+                    if (cell.tryingValue === num) {
+                        return (cell.stepState === 4) ? "#c0392b" : "#d35400";
+                    }
+                    return "#1f618d";
+                }
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.preferredWidth: 1
+                Layout.preferredHeight: 1
             }
         }
+    }
+
+    // [DeadEnd 시각화] 후보가 0개여서 막다른 길에 도달했을 때 경고 표시
+    Text {
+        anchors.centerIn: parent
+        visible: cell.isTarget && cell.stepState === 3 && cell.value === 0
+        text: "✕"
+        font.pixelSize: 22
+        font.bold: true
+        color: "#e74c3c"
     }
 
     // 2. 숫자 입력 TextField & 키보드 탐색 제어
@@ -77,11 +124,18 @@ Rectangle {
         anchors.fill: parent
         text: cell.value === 0 ? "" : cell.value.toString()
         font.pixelSize: 24
+        font.bold: cell.isGiven || cell.isTarget
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         background: null
         selectByMouse: false
-        color: cell.isError ? "red" : "black" // 에러 시 글자색 빨강
+        color: {
+            if (cell.isError) return "red";
+            if (cell.isTarget && cell.stepState === 4) return "#c0392b";    // 백트래킹 실패 숫자
+            if (cell.isTarget && cell.stepState === 2) return "#1d6fa5";    // 현재 대입 시도 숫자
+            if (!cell.isGiven) return "#2471a3";                            // solver가 채운 숫자
+            return "#2c3e50";                                               // 초기/사용자 숫자
+        }
 
         // 커서를 그리는 델리게이트를 빈 아이템으로 오버라이드하여 제거
         cursorDelegate: Item {}

@@ -32,6 +32,9 @@ private slots:
     // 6. 백엔드가 작업 중(isBusy)일 때 UI 조작 방지(enabled: false) 검증
     void testGridDisabledWhileBusy();
 
+    // 7. QML 셀 내부 3x3 후보 Text 가시성, DeadEnd/Backtracking 색상, 프로퍼티 반영 및 StepInfoBar 바인딩 검증
+    void testVisualizationStepRendering();
+
 private:
     bool m_defaultVisualize{false};
     int m_defaultDelay{0};
@@ -285,6 +288,48 @@ void TestSudokuGui::testGridDisabledWhileBusy()
     QTest::keyClick(m_window, '9');
     QCOMPARE(driver.cell(80).value(), 0);
 }
+
+void TestSudokuGui::testVisualizationStepRendering()
+{
+    SudokuBackend* backend = findBackend();
+    QVERIFY(backend);
+    backend->setVisualize(true);
+
+    SudokuDriver driver(m_window);
+    QVector<QVector<int>> stepBoard(9, QVector<int>(9, 0));
+    stepBoard[0][0] = 5;
+
+    // DeadEnd 상태 반영 및 배경색 확인 (90ms ColorAnimation 고려해 QTRY_COMPARE 사용)
+    StepInfo deadInfo{stepBoard, 0, 1, {}, StepState::DeadEnd, 0, QStringLiteral("DeadEnd")};
+    QMetaObject::invokeMethod(backend, "handleStepUpdate", Qt::DirectConnection, Q_ARG(StepInfo, deadInfo));
+
+    QQuickItem* cell1{driver.cell(0, 1).item()};
+    QTRY_COMPARE(driver.cell(0, 1).stepState(), static_cast<int>(StepState::DeadEnd));
+    QTRY_COMPARE(cell1->property("color").value<QColor>(), QColor("#fadbd8"));
+
+    // 2. Backtracking 상태: 실패 숫자(4) 유지 + 주황 배경 + 3x3 후보 opacity 검증
+    stepBoard[0][1] = 4;
+    StepInfo btInfo{stepBoard, 0, 1, {4, 7}, StepState::Backtracking, 4, QStringLiteral("Backtracking")};
+    QMetaObject::invokeMethod(backend, "handleStepUpdate", Qt::DirectConnection, Q_ARG(StepInfo, btInfo));
+
+    QTRY_COMPARE(driver.cell(0, 1).value(), 4);
+    QTRY_COMPARE(driver.cell(0, 1).tryingValue(), 4);
+    QTRY_COMPARE(cell1->property("color").value<QColor>(), QColor("#fdebd0"));
+
+    // 비타겟 빈 셀 (0, 2)에서 후보 4는 opacity 0, 후보 1은 opacity 1인지 확인
+    QQuickItem* cell2 = driver.cell(0, 2).item();
+    const auto texts{cell2->findChildren<QQuickItem*>()};
+    bool foundHidden4{false}, foundVisible1{false};
+    for (QQuickItem* child : texts) {
+        const QString t{child->property("text").toString()};
+        if (t == QStringLiteral("4") && qFuzzyIsNull(child->opacity())) foundHidden4 = true;
+        if (t == QStringLiteral("1") && qFuzzyCompare(child->opacity(), 1.0)) foundVisible1 = true;
+    }
+    QVERIFY(foundHidden4);
+    QVERIFY(foundVisible1);
+}
+
+
 
 // 앞 테스트(실패 포함)의 상태가 남지 않도록 보드 전체와 UI 상태를 초기화
 void TestSudokuGui::resetBoard()

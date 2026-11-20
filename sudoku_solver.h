@@ -14,6 +14,15 @@ enum class SolveResult {
     Aborted
 };
 
+// 시각화 단계 상태 정의
+enum class StepState {
+    None = 0,
+    Selecting,      // 타겟 셀 선정 및 후보 탐색
+    Trying,         // 후보 숫자 대입 시도 중
+    DeadEnd,        // 넣을 수 있는 후보가 없음 (모순/막다른 길 감지)
+    Backtracking    // 하위 탐색 실패로 인해 대입했던 값을 취소하고 되돌아감
+};
+
 // =======================================================================
 // StepInfo: 탐색 단계 상태 전달 및 스레드 간 비동기 전송을 위한 통합 데이터 객체
 //
@@ -21,11 +30,13 @@ enum class SolveResult {
 // - Q_DECLARE_METATYPE 등록을 통해 스레드 간 큐 전송(QueuedConnection) 및 보관이 안전함.
 // =======================================================================
 struct StepInfo {
-    QVector<QVector<int>> board{};         // 필수: 현재 9x9 보드 상태
-    int targetRow{-1};                          // 현재 주목 중인 행
-    int targetCol{-1};                          // 현재 주목 중인 열
-    QVector<int> candidates{};                  // MRV 등 후보 숫자 목록
-    QString extraMessage{};                     // 알고리즘 상태 설명 텍스트
+    QVector<QVector<int>> board{};      // 필수: 현재 9x9 보드 상태
+    int targetRow{-1};                  // 현재 주목 중인 행
+    int targetCol{-1};                  // 현재 주목 중인 열
+    QVector<int> candidates{};          // MRV 등 후보 숫자 목록
+    StepState state{StepState::None};   // 현재 단계 상태
+    int tryingValue{0};                 // 시도 중이거나 백트래킹 중인 숫자
+    QString extraMessage{};             // 알고리즘 상태 설명 텍스트
 };
 Q_DECLARE_METATYPE(StepInfo)
 
@@ -47,6 +58,7 @@ public:
 
     // 유효성 검사
     static bool isValid(const QVector<QVector<int>> &board, int r, int c, int num, bool ignoreSelf = false);
+    static QVector<int> getCandidates(const QVector<QVector<int>> &board, int r, int c);    
 
     // 백트래킹 풀이
     // callback이 nullptr이면 일반 실행, 있으면 매 단계 호출

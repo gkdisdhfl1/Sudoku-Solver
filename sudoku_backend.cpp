@@ -7,6 +7,17 @@
 #include <bitset>
 #include <cstddef>
 
+namespace {
+    QVariantList toVariantList(const QVector<int>& nums)
+    {
+        QVariantList list;
+        list.reserve(nums.size());
+        for (int num : nums)
+            list.append(num);
+        return list;
+    }
+} // namespace
+
 SudokuBackend::SudokuBackend(QObject *parent)
     : QAbstractListModel{parent}
 {
@@ -22,6 +33,7 @@ SudokuBackend::SudokuBackend(QObject *parent)
     qRegisterMetaType<std::expected<int, SolveResult>>("std::expected<int, SolveResult>");
     qRegisterMetaType<SolverWorker::JobType>("SolverWorker::JobType");
     qRegisterMetaType<StepInfo>("StepInfo");
+    qRegisterMetaType<StepState>("StepState");
 
     // 초기 보드에 대한 후보 캐시 계산
     recalculateAllCandidates();
@@ -64,6 +76,11 @@ QVariant SudokuBackend::data(const QModelIndex &index, int role) const
     } else if (role == IsTargetRole) {
         return (idx == m_targetIndex);
     } else if (role == CandidatesRole) {
+        // 타겟 셀은 대입/백트래킹 중에도 기존 후보 목록을 배경에 유지함
+        if (idx == m_targetIndex && !m_targetCandidates.isEmpty()) {
+            return toVariantList(m_targetCandidates);
+        }
+
         // 해당 빈 셀에 들어갈 수 있는 1~9 유효 후보 숫자를 즉시 계산
         QVariantList candidateList;
         if (m_board[r][c] == 0) {
@@ -75,6 +92,12 @@ QVariant SudokuBackend::data(const QModelIndex &index, int role) const
             }
         }
         return candidateList;
+    } else if (role == IsGivenRole) {
+        return m_isGiven.test(idx);
+    } else if (role == StepStateRole) {
+        return (idx == m_targetIndex) ? static_cast<int>(m_stepState) : static_cast<int>(StepState::None);
+    } else if (role == TryingValueRole) {
+        return (idx == m_targetIndex) ? m_tryingValue : 0;
     }
 
     return QVariant();
@@ -87,6 +110,9 @@ QHash<int, QByteArray> SudokuBackend::roleNames() const
     roles[ErrorRole] = "isError";
     roles[CandidatesRole] = "candidates";
     roles[IsTargetRole] = "isTarget";
+    roles[IsGivenRole] = "isGiven";
+    roles[StepStateRole] = "stepState";
+    roles[TryingValueRole] = "tryingValue";
     return roles;
 }
 
@@ -151,6 +177,11 @@ QString SudokuBackend::statusMessage() const
     return m_statusMessage;
 }
 
+QVariantList SudokuBackend::targetCandidates() const
+{
+    return toVariantList(m_targetCandidates);
+}
+
 void SudokuBackend::setCell(int cellIndex, int value)
 {
     if(m_isBusy) return; // 작업 중엔 수정 불가
@@ -163,6 +194,7 @@ void SudokuBackend::setCell(int cellIndex, int value)
 
     if(m_board[r][c] != value) {
         m_board[r][c] = value;
+        m_isGiven.set(cellIndex, value != 0);
 
         // 1. 모델 영향을 받는 피어 셀(최대 21개)을 bitset 마스크로 추적
         std::bitset<81> affectedMask;
@@ -170,7 +202,7 @@ void SudokuBackend::setCell(int cellIndex, int value)
 
         // 2. 자기 자신: 값과 후보 둘 다 갱신
         QModelIndex selfIdx = index(cellIndex, 0);
-        emit dataChanged(selfIdx, selfIdx, {ValueRole, CandidatesRole});
+        emit dataChanged(selfIdx, selfIdx, {ValueRole, CandidatesRole, IsGivenRole});
 
         // 3. 20개 피어 셀 중 빈 칸(m_board == 0)인 셀에 대해서만 CandidatesRole만 정밀 타겟팅 방출
         for (int idx{0}; idx < 81; ++idx) {
@@ -203,6 +235,7 @@ void SudokuBackend::clear()
     // 뷰가 읽기 전에 에러 상태도 미리 초기화
     bool wasErrors = m_errorCells.any();
     m_errorCells.reset();
+    m_isGiven.reset();
     endResetModel();
 
     // 에러 상태가 변경되었음을 알리는 프로퍼티 신호 방출
@@ -275,6 +308,9 @@ void SudokuBackend::solve()
         return;
     }
 
+    // 풀이 시작 시점의 보드 숫자를 초기 문제(Given)로 확정
+    syncGivenCellsFromBoard();
+    emit dataChanged(index(0, 0), index(80, 0), {IsGivenRole});
     startWorker(SolverWorker::JobType::Solve);
 }
 
@@ -315,15 +351,22 @@ void SudokuBackend::handleWorkerFinished(SolverWorker::JobType jobType, std::exp
     m_isBusy = false;
     m_isPaused = false;
     m_targetIndex = -1;
+    m_stepState = StepState::None;
+    m_tryingValue = 0;
+    m_targetCandidates.clear();
     m_statusMessage.clear();
     emit isBusyChanged();
     emit isPausedChanged();
     emit statusMessageChanged();
+    emit stepInfoChanged();
 
     // 최종 상태 캐시 동기화 및 뷰 전체 갱신
     recalculateAllCandidates();
+    if (jobType == SolverWorker::JobType::Generate && result.has_value()) {
+        syncGivenCellsFromBoard();
+    }
 
-    // 전체 역할 갱신 (IsTargetRole 포함)
+    // 전체 역할 갱신 (IsTargetRole, StepStateRole 등 포함)
     emit dataChanged(index(0, 0), index(80, 0));
 
     m_worker = nullptr;
@@ -352,6 +395,9 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
     m_targetIndex = (info.targetRow >= 0 && info.targetCol >= 0)
                     ? (info.targetRow * 9 + info.targetCol)
                     : -1;
+    m_stepState = (m_targetIndex >= 0) ? info.state : StepState::None;
+    m_tryingValue = (m_targetIndex >= 0) ? info.tryingValue : 0;
+    m_targetCandidates = (m_targetIndex >= 0) ? info.candidates : QVector<int>{};
     
     // 2. 메시지 생성 및 반영
     QString newMsg;
@@ -372,6 +418,7 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
         m_statusMessage = newMsg;
         emit statusMessageChanged();
     }
+    emit stepInfoChanged();
 
     // 3. 보드 데이터 비교 및 20여 개 주변 셀 캐시 갱신
     std::vector<int> changedIndices;
@@ -401,7 +448,8 @@ void SudokuBackend::handleStepUpdate(const StepInfo& info)
     }
 
     // 4. 보드 숫자, 연필 자국, 타겟 하이라이트를 동시 갱신
-    emit dataChanged(index(0, 0), index(80, 0), {ValueRole, CandidatesRole, IsTargetRole});
+    emit dataChanged(index(0, 0), index(80, 0), 
+    {ValueRole, CandidatesRole, IsTargetRole, StepStateRole, TryingValueRole});
 }
 
 //  --- private ---
@@ -495,6 +543,15 @@ void SudokuBackend::updatePeerCandidatesAt(int r, int c, std::bitset<81>* update
     for (int br{0}; br < 3; ++br) {
         for (int bc{0}; bc < 3; ++bc) {
             updateOnce(boxStartR + br, boxStartC + bc);
+        }
+    }
+}
+
+void SudokuBackend::syncGivenCellsFromBoard()
+{
+    for (int r{0}; r < 9; ++r) {
+        for (int c{0}; c < 9; ++c) {
+            m_isGiven.set(r * 9 + c, m_board[r][c] != 0);
         }
     }
 }

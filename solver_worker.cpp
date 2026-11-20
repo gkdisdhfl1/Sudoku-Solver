@@ -73,7 +73,6 @@ void SolverWorker::process()
         );
 
         if (result == SolveResult::Success) {
-            emit stepUpdated(StepInfo{m_board});
             // 성공 : elapsedMs 데이터 주입
             emit finished(m_jobType, static_cast<int>(pureElapsedMs));
         } else {
@@ -128,7 +127,9 @@ bool SolverWorker::processStep(const StepInfo& info)
     }
 
     // 2. UI 갱신 (Throttling)
-    if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
+    const bool isCriticalStep {(info.state == StepState::DeadEnd || info.state == StepState::Backtracking)};
+    
+    if(m_delay > THROTTLING_DELAY_THRESHOLD_MS || isCriticalStep || m_updateTimer.elapsed() >= UI_UPDATE_INTERVAL_MS) {
         auto emitStart = std::chrono::steady_clock::now();
         
         emit stepUpdated(info);

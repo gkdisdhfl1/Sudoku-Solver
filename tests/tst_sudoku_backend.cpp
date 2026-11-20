@@ -15,6 +15,7 @@ private slots:
     void testClearResetsCandidatesImmediately();
     void testClearResetsErrorsAtomically();
     void testSetCellEmitsDataChangedForPeers();
+    void testVisualizationRolesAndTargetCandidates();
 };
 
 void TestSudokuBackend::initTestCase()
@@ -174,6 +175,38 @@ void TestSudokuBackend::testSetCellEmitsDataChangedForPeers()
     peerCands = backend.data(backend.index(1, 0), SudokuBackend::CandidatesRole).toList();
     QVERIFY(peerCands.contains(5));
     QCOMPARE(peerCands.size(), 9);
+}
+
+void TestSudokuBackend::testVisualizationRolesAndTargetCandidates()
+{
+    SudokuBackend backend;
+    backend.setVisualize(true);
+    backend.setCell(0, 5); // index 0 = (0, 0) 초기 숫자
+    QCOMPARE(backend.data(backend.index(0, 0), SudokuBackend::IsGivenRole).toBool(), true);
+    QCOMPARE(backend.data(backend.index(1, 0), SudokuBackend::IsGivenRole).toBool(), false);
+
+    QSignalSpy stepSpy(&backend, &SudokuBackend::stepInfoChanged);
+    QVector<QVector<int>> stepBoard(9, QVector<int>(9, 0));
+    stepBoard[0][0] = 5;
+    stepBoard[0][1] = 3; // (0, 1)에 3 대입 시도
+
+    StepInfo tryingInfo{stepBoard, 0, 1, {3, 4}, StepState::Trying, 3, QStringLiteral("Trying 3")};
+    QMetaObject::invokeMethod(&backend, "handleStepUpdate", Qt::DirectConnection, Q_ARG(StepInfo, tryingInfo));
+
+    QCOMPARE(stepSpy.count(), 1);
+    QCOMPARE(backend.stepState(), static_cast<int>(StepState::Trying));
+    QCOMPARE(backend.targetRow(), 0);
+    QCOMPARE(backend.targetCol(), 1);
+    QCOMPARE(backend.tryingValue(), 3);
+
+    // 타겟 셀은 값이 채워져도 후보 목록을 유지하고, 같은 행 빈 셀 (0, 2)에서는 3이 제외되어야 함
+    QVariantList targetCands {backend.data(backend.index(1, 0), SudokuBackend::CandidatesRole).toList()};
+    QCOMPARE(targetCands, QVariantList({3, 4}));
+    QVariantList peerCands {backend.data(backend.index(2, 0), SudokuBackend::CandidatesRole).toList()};
+    QVERIFY(!peerCands.contains(3));
+    QCOMPARE(backend.data(backend.index(1, 0), SudokuBackend::StepStateRole).toInt(), static_cast<int>(StepState::Trying));
+    QCOMPARE(backend.data(backend.index(1, 0), SudokuBackend::TryingValueRole).toInt(), 3);
+    QCOMPARE(backend.data(backend.index(2, 0), SudokuBackend::StepStateRole).toInt(), static_cast<int>(StepState::None));
 }
 
 QTEST_GUILESS_MAIN(TestSudokuBackend)

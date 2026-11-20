@@ -14,6 +14,7 @@ private slots:
     void testSolveUnsolvable();
     void testSolveCallbackAbort();
     void testGenerateAndUniqueSolution();
+    void testSolveVisualizationStepStates();
 
 private:
     QVector<QVector<int>> createSamplePuzzle();
@@ -158,6 +159,50 @@ void TestSudokuSolver::testGenerateAndUniqueSolution()
         // 생성된 퍼즐이 반드시 유일해를 갖는지 검증
         QVERIFY(solver.hasUniqueSolution(board));
     }
+}
+
+void TestSudokuSolver::testSolveVisualizationStepStates()
+{
+    SudokuSolver solver;
+    // 해가 없어 DeadEnd와 Backtracking을 모두 거치는 보드
+    QVector<QVector<int>> board = {
+        {5, 1, 6, 8, 4, 9, 7, 3, 2},
+        {3, 0, 7, 6, 0, 5, 0, 0, 0},
+        {8, 0, 9, 7, 0, 0, 0, 6, 5},
+        {1, 3, 5, 0, 6, 0, 9, 0, 7},
+        {4, 7, 2, 5, 9, 1, 0, 0, 6},
+        {9, 6, 8, 3, 7, 0, 0, 5, 0},
+        {2, 5, 3, 1, 8, 6, 0, 7, 4},
+        {6, 8, 4, 2, 0, 7, 5, 0, 0},
+        {7, 9, 1, 0, 5, 0, 6, 0, 8}
+    };
+
+    bool sawSelecting{false}, sawTrying{false}, sawDeadEnd{false}, sawBacktracking{false};
+    bool backtrackKeptValue{true};
+
+    auto result = solver.solve(board, SudokuSolver::SolveAlgorithm::MRV, [&](const StepInfo& info) {
+        if (info.state == StepState::Selecting) sawSelecting = true;
+        if (info.state == StepState::Trying) {
+            sawTrying = true;
+            if (info.board[info.targetRow][info.targetCol] != info.tryingValue)
+                return false;
+        }
+        if (info.state == StepState::DeadEnd) sawDeadEnd = true;
+        if (info.state == StepState::Backtracking) {
+            sawBacktracking = true;
+            // 실패 숫자를 지우기 전에 보드에 아직 남아 있어야 함
+            if (info.board[info.targetRow][info.targetCol] != info.tryingValue)
+                backtrackKeptValue = false;
+        }
+        return true;
+    });
+
+    QCOMPARE(result, SolveResult::Failed);
+    QVERIFY(sawSelecting);
+    QVERIFY(sawTrying);
+    QVERIFY(sawDeadEnd);
+    QVERIFY(sawBacktracking);
+    QVERIFY(backtrackKeptValue);
 }
 
 QTEST_GUILESS_MAIN(TestSudokuSolver)
