@@ -129,6 +129,21 @@ public:
         return it ? it->property("candidates").toList() : QVariantList();
     }
 
+    int stepState() const {
+        QQuickItem* it{item()};
+        return it ? it->property("stepState").toInt() : 0;
+    }
+
+    bool isGiven() const {
+        QQuickItem* it{item()};
+        return it ? it->property("isGiven").toBool() : false;
+    }
+
+    int tryingValue() const {
+        QQuickItem* it{item()};
+        return it ? it->property("tryingValue").toInt() : 0;
+    }
+
     int index() const {
         return m_index;
     }

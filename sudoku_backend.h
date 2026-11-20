@@ -22,6 +22,11 @@ class SudokuBackend : public QAbstractListModel
     Q_PROPERTY(bool isPaused READ isPaused NOTIFY isPausedChanged)
 
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
+    Q_PROPERTY(int stepState READ stepState NOTIFY stepInfoChanged)
+    Q_PROPERTY(int targetRow READ targetRow NOTIFY stepInfoChanged)
+    Q_PROPERTY(int targetCol READ targetCol NOTIFY stepInfoChanged)
+    Q_PROPERTY(int targetValue READ tryingValue NOTIFY stepInfoChanged)
+    Q_PROPERTY(QVariantList targetCandidates READ targetCandidates NOTIFY stepInfoChanged)
 
     QML_ELEMENT // QML에서 직접 사용할 수 있게 등록
 public:
@@ -33,7 +38,10 @@ public:
         ValueRole = Qt::UserRole + 1,
         ErrorRole,
         CandidatesRole, // 1~9 유효 후보 숫자 목록
-        IsTargetRole  // 알고리즘이 주시 중인 타겟 셀 여부
+        IsTargetRole,   // 알고리즘이 주시 중인 타겟 셀 여부
+        IsGivenRole,    // 초기 문제(사용자/생성) 숫자 여부
+        StepStateRole,  // 타겟 셀 단계 상태 (StepState)
+        TryingValueRole // 시도 중/백트래킹 중인 숫자
     };
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
@@ -48,6 +56,11 @@ public:
     bool isBusy() const;
     bool isPaused() const;
     QString statusMessage() const;
+    int stepState() const { return static_cast<int>(m_stepState); }
+    int targetRow() const { return m_targetIndex >= 0 ? (m_targetIndex / 9) : -1; }
+    int targetCol() const { return m_targetIndex >= 0 ? (m_targetIndex % 9) : -1; }
+    int tryingValue() const { return m_tryingValue; };
+    QVariantList targetCandidates() const;
 
     void setVisualize(bool v);
     void setDelay(int d);
@@ -75,6 +88,7 @@ signals:
     void solveFinished(int status, int elapsedMs);
     void generateFinished(bool success);
     void statusMessageChanged();
+    void stepInfoChanged();
 
 private slots:
     // 워커 시그널 처리용
@@ -82,14 +96,18 @@ private slots:
     void handleWorkerFinished(SolverWorker::JobType jobType, std::expected<int, SolveResult> result);
 
 private:
-    QVector<QVector<int>> m_board; // 0~80, 0 means empty
+    QVector<QVector<int>> m_board;                      // 0~80, 0 means empty
     std::bitset<81> m_errorCells;
-    std::array<std::bitset<9>, 81> m_candidateCache; // 81개 셀 유효 후보 비트셋 캐시
-    int m_targetIndex{-1}; // 현재 알고리즘이 주시 중인 1차원 셀 인덱스
+    std::array<std::bitset<9>, 81> m_candidateCache;    // 81개 셀 유효 후보 비트셋 캐시
+    std::bitset<81> m_isGiven;                          // 초기 문제 숫자 마스크
+    int m_targetIndex{-1};                              // 현재 알고리즘이 주시 중인 1차원 셀 인덱스
+    StepState m_stepState {StepState::None};
+    int m_tryingValue{0};
+    QVector<int> m_targetCandidates;
 
     // 시각화 설정 변수
     bool m_visualize{false};
-    int m_delay{50}; // 기본값 50ms
+    int m_delay{50};                                    // 기본값 50ms
     bool m_isBusy{false}; // 작업 중 상태
     bool m_isPaused{false};
     SudokuSolver::SolveAlgorithm m_algorithm{SudokuSolver::SolveAlgorithm::BackTracking};
@@ -99,11 +117,12 @@ private:
     QPointer<QThread> m_workerThread{nullptr};
     QPointer<SolverWorker> m_worker{nullptr};
 
-    void checkErrors(); // 에러 검사 수행 및 리스트 업데이트
-    void startWorker(SolverWorker::JobType jobType, int difficulty = 0); // 공통 워커 시작 함수
-    void recalculateAllCandidates(); // 전체 후보 캐시 재계산 헬퍼
-    void updateCandidateCacheAt(int r, int c); // 특정 셀의 후보 비트셋 캐시 갱신 헬퍼
-    void updatePeerCandidatesAt(int r, int c, std::bitset<81>* updatedMask = nullptr); // 특정 셀과 연관된 20여 개 셀 캐시 증분 갱신
+    void checkErrors();                                                                     // 에러 검사 수행 및 리스트 업데이트
+    void startWorker(SolverWorker::JobType jobType, int difficulty = 0);                    // 공통 워커 시작 함수
+    void recalculateAllCandidates();                                                        // 전체 후보 캐시 재계산 헬퍼
+    void updateCandidateCacheAt(int r, int c);                                              // 특정 셀의 후보 비트셋 캐시 갱신 헬퍼
+    void updatePeerCandidatesAt(int r, int c, std::bitset<81>* updatedMask = nullptr);      // 특정 셀과 연관된 20여 개 셀 캐시 증분 갱신
+    void syncGivenCellsFromBoard();                                                         // 현재 보드의 0이 아닌 셀을 초기 문제 숫자로 마킹
 };
 
 #endif // SUDOKU_BACKEND_H

@@ -37,6 +37,19 @@ bool SudokuSolver::isValid(const QVector<QVector<int>> &board, int r, int c, int
     return true;
 }
 
+QVector<int> SudokuSolver::getCandidates(const QVector<QVector<int>> &board, int r, int c)
+{
+    QVector<int> validNums;
+    if (board[r][c] != 0)
+        return validNums;
+    
+    for (int num{1}; num <= 9; ++num) {
+        if (isValid(board, r, c, num))
+            validNums.append(num);
+    }
+    return validNums;
+}
+
 SolveResult SudokuSolver::solve(QVector<QVector<int>> &board, SolveAlgorithm algorithm, StepCallback callback)
 {
     // 보드 규격(9x9), 숫자 범위(0~9) 및 초기 중복 검사
@@ -138,31 +151,58 @@ SolveResult SudokuSolver::solveBacktracking(QVector<QVector<int>> &board, StepCa
                 board[r][c] = num;
 
                 // 시각화 및 중단 훅
-                if (callback) {
-                    if (!callback({board})) {
-                        board[r][c] = 0;             // 중단 즉시 자신이 넣었던 값을 0으로 리셋
-                        return SolveResult::Aborted; // 사용자가 중단 요청
-                    }
+                if (callback && 
+                    !callback({board,
+                         r, 
+                         c, 
+                         {}, 
+                         StepState::Trying,
+                         num, 
+                         QStringLiteral("Trying %1").arg(num)
+                        })) {
+                            board[r][c] = 0;             // 중단 즉시 자신이 넣었던 값을 0으로 리셋
+                            return SolveResult::Aborted; // 사용자가 중단 요청
                 }
 
                 SolveResult result = solveBacktracking(board, callback, idx + 1);
                 if (result == SolveResult::Success)
                     return SolveResult::Success;
 
-                // 실패했거나 중단되었으므로 대입한 값을 0으로 원상 복구
-                board[r][c] = 0;
-
                 // 중단 상태라면 다음 루프를 돌지 않고 즉시 상위 스택으로 전파
-                if (result == SolveResult::Aborted)
+                if (result == SolveResult::Aborted) {
+                    board[r][c] = 0;
                     return SolveResult::Aborted;
-
-                // 시각화 및 중단 훅 (지울 때)
-                if (callback) {
-                    if (!callback({board}))
-                        return SolveResult::Aborted; // 중단 즉시 반환
                 }
+
+                // 실패 시 보드 값을 지우기 전에 실패한 숫자(num)을 유지한 채 Backtracking 콜백 먼저 호출
+                if (callback 
+                    && !callback({board, 
+                        r, 
+                        c, 
+                        {}, 
+                        StepState::Backtracking, 
+                        num, 
+                        QStringLiteral("Backtracking from %1").arg(num)
+                    })) {
+                        board[r][c] = 0;
+                        return SolveResult::Aborted;
+                }
+
+                board[r][c] = 0;
             }
         }
+
+        if (callback &&
+            !callback({board, 
+                r, 
+                c, 
+                {}, 
+                StepState::DeadEnd, 
+                0, 
+                QStringLiteral("No valid number! Dead-end")
+            }))
+                return SolveResult::Aborted;
+
         return SolveResult::Failed;
     } else {
         // 채워진 칸은 다음 인덱스로 즉시 건너뜀
@@ -186,24 +226,55 @@ SolveResult SudokuSolver::solveRandomly(QVector<QVector<int>> &board, StepCallba
             if (isValid(board, r, c, num)) {
                 board[r][c] = num;
 
-                if (callback && !callback({board})) {
-                    board[r][c] = 0;
-                    return SolveResult::Aborted;
+                if (callback && 
+                    !callback({board, 
+                        r, 
+                        c, 
+                        {}, 
+                        StepState::Trying, 
+                        num, 
+                        QStringLiteral("Trying %1").arg(num)})) {
+                            board[r][c] = 0;
+                            return SolveResult::Aborted;
                 }
 
                 SolveResult result = solveRandomly(board, callback, idx + 1);
                 if (result == SolveResult::Success)
                     return SolveResult::Success;
 
+
+                if (result == SolveResult::Aborted) {
+                    board[r][c] = 0;
+                    return SolveResult::Aborted;
+                }
+
+                if (callback && 
+                    !callback({board, 
+                        r, 
+                        c, 
+                        {}, 
+                        StepState::Backtracking, 
+                        num, 
+                        QStringLiteral("Backtracking from %1").arg(num)
+                    })) {
+                        board[r][c] = 0;
+                        return SolveResult::Aborted;
+                }
+
                 board[r][c] = 0; // backtrack
-
-                if (result == SolveResult::Aborted)
-                    return SolveResult::Aborted;
-
-                if (callback && !callback({board}))
-                    return SolveResult::Aborted;
             }
         }
+        if (callback && 
+            !callback({board, 
+                r, 
+                c, 
+                {}, 
+                StepState::DeadEnd, 
+                0, 
+                QStringLiteral("No valid number! Dead-end")
+            }))
+                return SolveResult::Aborted;
+
         return SolveResult::Failed;
     } else {
         return solveRandomly(board, callback, idx + 1);
@@ -221,15 +292,22 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
     for (int r{0}; r < 9; ++r) {
         for (int c{0}; c < 9; ++c) {
             if (board[r][c] == 0) {
-                QVector<int> validNums;
-                for (int num{1}; num <= 9; ++num) {
-                    if (isValid(board, r, c, num)) {
-                        validNums.append(num);
-                    }
-                }
+                QVector<int> validNums {getCandidates(board, r, c)};
 
                 // 막다른 골목(들어갈 수 있는 숫자가 0개) 발견 시 즉시 백트랙
                 if (validNums.isEmpty()) {
+                    if (callback &&
+                        !callback({board, 
+                        r,
+                        c,
+                        {},
+                        StepState::DeadEnd,
+                        0,
+                        QStringLiteral("Conflict! 0 candidates left")
+                    })) {
+                        return SolveResult::Aborted;
+                    }
+                    
                     return SolveResult::Failed;
                 }
 
@@ -264,7 +342,14 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
     for (int num : bestValidNums) {
         board[bestR][bestC] = num;
 
-        if (callback && !callback({board, bestR, bestC, bestValidNums})) {
+        if (callback && !callback({board, 
+            bestR, 
+            bestC, 
+            bestValidNums,
+            StepState::Trying,
+            num,
+            QStringLiteral("Trying %1").arg(num)
+        })) {
             board[bestR][bestC] = 0;
             return SolveResult::Aborted;            
         }
@@ -273,14 +358,35 @@ SolveResult SudokuSolver::solveMRV(QVector<QVector<int>> &board, StepCallback ca
         if (result == SolveResult::Success)
             return SolveResult::Success;
 
-        board[bestR][bestC] = 0; // backtrack
-
-        if (result == SolveResult::Aborted)
+        if (result == SolveResult::Aborted) {
+            board[bestR][bestC] = 0;
             return SolveResult::Aborted;
+        }
 
-        if (callback && !callback({board, bestR, bestC, bestValidNums}))
-            return SolveResult::Aborted;
+        // 값을 0으로 비우기 전에 실패한 숫자(num)를 유지한 채 Backtracking 콜백 호출
+        if (callback &&
+            !callback({board, 
+                bestR, 
+                bestC, 
+                bestValidNums, 
+                StepState::Backtracking, 
+                num, 
+                QStringLiteral("Backtracking from %1").arg(num)
+            })) {
+                board[bestR][bestC] = 0;
+                return SolveResult::Aborted;
+        }
+
     }
+    if (callback && !callback({board, 
+        bestR, 
+        bestC, 
+        {}, 
+        StepState::DeadEnd, 
+        0, 
+        QStringLiteral("All candidates exhausted")
+    }))
+        return SolveResult::Aborted;
 
     return SolveResult::Failed;
 }
